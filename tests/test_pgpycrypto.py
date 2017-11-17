@@ -81,3 +81,7 @@ class TestCrypto:
         keyhandle_verified = pgpycrypto.verify(data=b'123', signature=sig)
         i = min(len(keyhandle_verified), len(keyhandle))
         assert keyhandle[-i:] == keyhandle_verified[-i:]
+
+
+    def test_sym_encrypt(self, pgpycrypto):
+        pass

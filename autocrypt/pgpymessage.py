@@ -388,3 +388,57 @@ def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
                 date, _dto, message_id, _extra)
     logger.debug('Generated multipart AC Setup body.')
     return msg
+
+
+def parse_ac_setup_header(msg):
+    if isinstance(msg, str):
+        msg = parser.parsestr(msg)
+    return msg.get(AC_SETUP_MSG)
+
+
+def parse_ac_setup_enc_part(enctext, passphrase, p):
+    enctext_list = enctext.split('\n')
+    pass_format = enctext_list.pop(2)
+    if pass_format != AC_PASSPHRASE_FORMAT:
+        logger.error('Passphrase format not found.')
+    pass_begins = enctext_list.pop(2)
+    if pass_begins[:len(AC_PASSPHRASE_BEGIN)] != AC_PASSPHRASE_BEGIN:
+        logger.error('{} not found.'.format(AC_PASSPHRASE_BEGIN))
+    if pass_begins[AC_PASSPHRASE_BEGIN_LEN:] != \
+            passphrase[:AC_PASSPHRASE_BEGIN_LEN]:
+        logger.error('The passphrase is invalid.')
+    logger.debug('Encrypted part without headers %s', "\n".join(enctext_list))
+    plainmsg = p.sym_decrypt("\n".join(enctext_list), passphrase)
+    return plainmsg
+
+
+def parse_ac_setup_payload(payload):
+    if isinstance(payload, str):
+        payload = parser.parsestr(payload)
+    filename = payload.get_filename()
+    attachment_text = payload.get_payload()
+    if filename:
+        with open(filename, 'w') as fp:
+            fp.write(attachment_text)
+    enc_starts = attachment_text.find('-----BEGIN PGP MESSAGE-----')
+    bodytext = attachment_text[:enc_starts]
+    logger.info(bodytext)
+    enc_ends = attachment_text.find('-----END PGP MESSAGE-----')
+    enctext = attachment_text[enc_starts:enc_ends] + '-----END PGP MESSAGE-----'
+    logger.debug('enctext %s', enctext)
+    return enctext
+
+
+def parse_ac_setup_email(msg, p, passphrase):
+    if isinstance(msg, str):
+        msg = parser.parsestr(msg)
+    if msg.get(AC_SETUP_MSG) != LEVEL_NUMBER:
+        logger.error('This is not an Autocrypt Setup Message v1')
+    description, payload = msg.get_payload()
+    logger.info(description.as_string())
+
+    enctext = parse_ac_setup_payload(payload)
+    plainmsg = parse_ac_setup_enc_part(enctext, passphrase, p)
+    p.import_keydata(str(plainmsg))
+    logger.info('Secret key imported.')
+    return plainmsg

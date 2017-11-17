@@ -11,7 +11,8 @@ from autocrypt.examples_data import (ALICE, BOB, RECIPIENTS, ALICE_KEYDATA,
                                      BOB_KEYDATA, BOB_GOSSIP, ALICE_AC,
                                      SUBJECT_GOSSIP, BODY_GOSSIP,
                                      BOB_KEYDATA_WRAPPED, CLEARTEXT_GOSSIP,
-                                     PASSPHRASE, AC_SETUP_PAYLOAD)
+                                     PASSPHRASE, AC_SETUP_PAYLOAD,
+                                     AC_SETUP_ENC)
 
 from autocrypt.constants import (MUTUAL, AC_PASSPHRASE_NUM_BLOCKS,
                                  AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_LEN,
@@ -37,7 +38,9 @@ from autocrypt.pgpymessage import (keydata_wrap, keydata_unwrap,
                                    gen_ac_setup_seckey,
                                    gen_ac_setup_passphrase,
                                    gen_ac_setup_enc_seckey,
-                                   gen_ac_setup_email)
+                                   gen_ac_setup_email, parse_ac_setup_payload,
+                                   parse_ac_setup_enc_part,
+                                   parse_ac_setup_enc_part)
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -146,3 +149,19 @@ def test_gen_ac_setup_email(pgpycrypto, datadir):
         f.write(ac_setup_email.as_string())
     assert ac_setup_email.as_string().split('\n')[:33] == \
         datadir.read('example-setup-message-pyac.eml').split('\n')[:33]
+
+
+def test_parse_ac_setup_payload(pgpycrypto):
+    enctext = parse_ac_setup_payload(AC_SETUP_PAYLOAD)
+    assert AC_SETUP_ENC == enctext + '\n'
+
+
+def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
+    plainmsg = parse_ac_setup_enc_part(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
+    assert plainmsg == datadir.read('example-setup-message-cleartext-pyac.eml')
+
+
+def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
+    enctext = datadir.read('example-setup-message-pyac.eml')
+    plainmsg = parse_ac_setup_enc_part(enctext)
+    assert plainmsg == datadir.read('example-setup-message-cleartext-pyac.eml')

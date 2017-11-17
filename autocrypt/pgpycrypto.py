@@ -439,3 +439,9 @@ class PGPyCrypto(object):
             text = PGPMessage.new(text)
         encmsg = text.encrypt(passphrase, cipher=SymmetricKeyAlgorithm.AES128)
         return encmsg
+
+    def sym_decrypt(self, text, passphrase):
+        if isinstance(text, str):
+            text = PGPMessage.new(text)
+        plainmsg = text.decrypt(passphrase)
+        return plainmsg
