@@ -36,6 +36,12 @@ def main():
             examplel1=autocrypt.examplel1:main
         ''',
         install_requires=["click>=6.0", "six", "PGPy>=0.4.1", "emailpgp"],
+        extras_require={
+            'dev': ['ipython', 'pyflakes', 'pep8'],
+            'test': ['tox', 'pytest'],
+            'doc': ['sphinx', 'pylint']
+        },
+        tests_require=['pytest'],
         zip_safe=False,
     )
 
