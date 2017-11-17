@@ -22,7 +22,8 @@ from pgpy.constants import (CompressionAlgorithm, HashAlgorithm, KeyFlags,
                             PubKeyAlgorithm, SymmetricKeyAlgorithm)
 
 # TODO: these two functions should be in a separate file
-from .bingpg import KeyInfo, b64encode_u
+from .keyinfo import KeyInfo
+from .utils import b64encode_u
 from .conflog import LOGGING
 from .constants import KEY_SIZE
 
