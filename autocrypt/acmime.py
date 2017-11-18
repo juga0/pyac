@@ -33,7 +33,8 @@ class MIMEMultipartACSetup(MIMEMultipart):
         It will create the Email structure:
         └┬╴multipart/mixed
          ├─╴text/plain
-         └─╴application/autocrypt-setup attachment [autocrypt-setup-message.html]
+         └─╴application/autocrypt-setup attachment
+            [autocrypt-setup-message.html]
 
          """
         # _params['protocol'] = "?"
@@ -66,10 +67,12 @@ class MIMEApplicationACSetupPayload(MIMEApplication):
         constructor, which turns them into parameters on the Content-Type
         header.
         """
+        # NOTE: this is not needed but might be useful to add it.
         # _params["Content-Description"] = "Autocrypt Setup Message key"
         # NOTE: adding Content-Disposition as header to be able to pass
-        # filename param without quoting
-        # _params["Content-Disposition"] = ['attachment', "autocrypt-setup-message.txt"]
+        # filename param without quoting.
+        # _params["Content-Disposition"] = \
+        #     'attachment; filename="autocrypt-setup-message.html"''
         MIMEApplication.__init__(self, _data, _subtype, _encoder,
                                  policy=policy, **_params)
 
@@ -92,5 +95,7 @@ class MIMETextACSetupDescription(MIMEText):
         constructor, which turns them into parameters on the Content-Type
         header.
         """
-        # _params["Content-Description"] = "Autocrypt Setup Message description"
+        # NOTE: this is not needed but might be useful to add it.
+        # _params["Content-Description"] = \
+        #    "Autocrypt Setup Message description"
         MIMEText.__init__(self, _data, _subtype)
