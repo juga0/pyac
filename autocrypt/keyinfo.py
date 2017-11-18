@@ -16,7 +16,7 @@ class KeyInfo:
         return self.id[-i:] == other_id[-i:]
 
     def __str__(self):
-        return "KeyInfo(id={id!r}, uids={uids!r}, bits={bits}, type={type})".format(
-            **self.__dict__)
+        return "KeyInfo(id={id!r}, uids={uids!r}, bits={bits}, type={type})". \
+            format(**self.__dict__)
 
     __repr__ = __str__
