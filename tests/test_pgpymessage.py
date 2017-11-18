@@ -40,7 +40,7 @@ from autocrypt.pgpymessage import (keydata_wrap, keydata_unwrap,
                                    gen_ac_setup_enc_seckey,
                                    gen_ac_setup_email, parse_ac_setup_payload,
                                    parse_ac_setup_enc_part,
-                                   parse_ac_setup_enc_part)
+                                   parse_ac_setup_email)
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -158,10 +158,26 @@ def test_parse_ac_setup_payload(pgpycrypto):
 
 def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
     plainmsg = parse_ac_setup_enc_part(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
-    assert plainmsg == datadir.read('example-setup-message-cleartext-pyac.eml')
+    # NOTE: this is needed because the blob was not originally encrypted
+    # with PGPy. It'll fail with other PGPy versions
+    pt = plainmsg.message
+    pt = pt.replace('\r\n', '\n').rstrip('\n')
+    ptlist = pt.split('\n')
+    ptlist.insert(1, 'Version: PGPy v0.4.3')
+    pt = "\n".join(ptlist)
+    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
+    assert pt == plaintext.rstrip('\n')
 
 
-def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
+def test_parse_ac_setup_email(pgpycrypto, datadir):
     enctext = datadir.read('example-setup-message-pyac.eml')
-    plainmsg = parse_ac_setup_enc_part(enctext)
-    assert plainmsg == datadir.read('example-setup-message-cleartext-pyac.eml')
+    plainmsg = parse_ac_setup_email(enctext, pgpycrypto, PASSPHRASE)
+    # NOTE: this is needed because the blob was not originally encrypted
+    # with PGPy. It'll fail with other PGPy versions
+    pt = plainmsg.message
+    pt = pt.replace('\r\n', '\n').rstrip('\n')
+    ptlist = pt.split('\n')
+    ptlist.insert(1, 'Version: PGPy v0.4.3')
+    pt = "\n".join(ptlist)
+    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
+    assert pt == plaintext.rstrip('\n')

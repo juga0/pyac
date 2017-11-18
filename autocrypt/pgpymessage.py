@@ -439,6 +439,6 @@ def parse_ac_setup_email(msg, p, passphrase):
 
     enctext = parse_ac_setup_payload(payload)
     plainmsg = parse_ac_setup_enc_part(enctext, passphrase, p)
-    p.import_keydata(str(plainmsg))
+    p.import_keydata(plainmsg.message)
     logger.info('Secret key imported.')
     return plainmsg
