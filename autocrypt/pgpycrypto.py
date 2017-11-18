@@ -442,6 +442,6 @@ class PGPyCrypto(object):
 
     def sym_decrypt(self, text, passphrase):
         if isinstance(text, str):
-            text = PGPMessage.new(text)
+            text = PGPMessage.from_blob(text)
         plainmsg = text.decrypt(passphrase)
         return plainmsg
