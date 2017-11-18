@@ -1,4 +1,7 @@
+0.2.0
+------
 
+- Level 1 fully implemented. It needs some cleaning and more tests.
 
 0.1.1
 ------
