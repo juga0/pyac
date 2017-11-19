@@ -28,13 +28,13 @@ from autocrypt.pgpymessage import (wrap, unwrap,
                                    header_wrap, gen_ac_headerdict,
                                    gen_ac_headervaluestr, parse_header_value,
                                    parse_ac_headers,
-                                   gen_mime_enc_multipart,
+                                   gen_encrypted_email,
                                    add_headers, add_ac_headers,
-                                   gen_ac_email, decrypt_mime_enc_email,
+                                   gen_ac_email, decrypt_email,
                                    parse_ac_email,
-                                   ac_header_email_unwrap_keydata,
-                                   gen_ac_gossip_header,
-                                   gen_ac_gossip_headers,
+                                   header_unwrap_keydata,
+                                   gen_ac_gossip_headervalue,
+                                   gen_ac_gossip_headervalues,
                                    parse_ac_gossip_headers,
                                    store_gossip_keys, get_skey_from_msg,
                                    parse_ac_gossip_email,
@@ -81,21 +81,21 @@ def test_gen_ac_email(pgpycrypto, datadir):
 
 def test_parse_ac_email(pgpycrypto, datadir):
     text = datadir.read('example-simple-autocrypt-pyac.eml')
-    msg, dec = parse_ac_email(text, pgpycrypto)
+    msg, pt = parse_ac_email(text, pgpycrypto)
     # NOTE: the following is needed cause decrypt returns plaintext to have
     # same API as bingpg
-    assert parser.parsestr(dec).get_payload() == BODY_AC
+    assert parser.parsestr(pt).get_payload() == BODY_AC
 
 
-def test_gen_ac_gossip_header():
-    h = gen_ac_gossip_header(BOB, BOB_KEYDATA)
+def test_gen_ac_gossip_headervalue():
+    h = gen_ac_gossip_headervalue(BOB, BOB_KEYDATA)
     assert h == header_unwrap(BOB_GOSSIP)
 
 
 def test_parse_ac_gossip_header(pgpycrypto, datadir):
     text = datadir.read('example-gossip-cleartext_pyac.eml')
     gossip_list = parse_ac_gossip_headers(text)
-    headers = gen_ac_gossip_headers(RECIPIENTS, pgpycrypto)
+    headers = gen_ac_gossip_headervalues(RECIPIENTS, pgpycrypto)
     assert headers == gossip_list
 
 
@@ -228,7 +228,7 @@ def test_parse_email(pgpycrypto, datadir):
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
     text = datadir.read('example-simple-autocrypt-pyac.eml')
-    msg, dec = parse_ac_email(text, pgpycrypto)
+    msg, pt = parse_ac_email(text, pgpycrypto)
     # NOTE: the following is needed cause decrypt returns plaintext to have
     # same API as bingpg
-    assert parser.parsestr(dec).get_payload() == BODY_AC
+    assert parser.parsestr(pt).get_payload() == BODY_AC

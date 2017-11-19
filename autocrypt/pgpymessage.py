@@ -38,10 +38,10 @@ parser = Parser(policy=policy.default)
 __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'header_unwrap', 'header_wrap', 'gen_ac_headerdict',
            'gen_ac_headervaluestr', 'parse_header_value', 'parse_ac_headers',
-           'gen_mime_enc_multipart', 'add_headers', 'add_ac_headers',
-           'gen_ac_email', 'decrypt_mime_enc_email', 'parse_ac_email',
-           'ac_header_email_unwrap_keydata', 'gen_ac_gossip_header',
-           'gen_ac_gossip_headers', 'parse_ac_gossip_headers',
+           'gen_encrypted_email', 'add_headers', 'add_ac_headers',
+           'gen_ac_email', 'decrypt_email', 'parse_ac_email',
+           'header_unwrap_keydata', 'gen_ac_gossip_headervalue',
+           'gen_ac_gossip_headervalues', 'parse_ac_gossip_headers',
            'store_gossip_keys', 'get_skey_from_msg', 'parse_ac_gossip_email',
            'gen_ac_gossip_cleartext_email', 'gen_ac_gossip_email',
            'gen_ac_setup_seckey', 'gen_ac_setup_passphrase',
@@ -173,7 +173,7 @@ def parse_ac_headers(msg):
 
 def add_headers(msg, sender, recipients, subject, date=None, _dto=False,
                 message_id=None, _extra=None):
-    """Generate Email headers.
+    """Add headers to Email.
 
     :param msg: an Email Message
     :type msg: Message
@@ -198,6 +198,13 @@ def add_headers(msg, sender, recipients, subject, date=None, _dto=False,
 
 
 def add_ac_headers(msg, sender, keydata, pe):
+    """Add Autocrypt headers to Email.
+
+    :param msg: an Email Message
+    :type msg: Message
+    :return: an Email with Autocrypt headers
+    :rtype: Message
+    """
     ac_header = gen_ac_headervaluestr(sender, keydata, pe)
     ac_header_wrappedstr = header_wrap(ac_header)
     # NOTE: maxlinelen and continuation_ws are set to defaults.
@@ -214,31 +221,59 @@ def add_ac_headers(msg, sender, keydata, pe):
     return msg
 
 
-def gen_mime_enc_multipart(mime_enc_body, boundary=None):
-    msg = MIMEMultipartPGP(mime_enc_body, boundary=boundary)
-    logger.debug('Generated encrypted multipart body.')
+def gen_encrypted_email(encryptedstr, boundary=None):
+    """Generate encrypted/multipart Email from encrypted body.
+
+    :param encryptedstr: an encrypted Email body
+    :type encryptedstr: str
+    :return: an Email Message with the encrypted str as body
+    :rtype: Message
+    """
+    msg = MIMEMultipartPGP(encryptedstr, boundary=boundary)
+    logger.debug('Generated encrypted MIME Multipart.')
     return msg
 
+
+def header_unwrap_keydata(text):
+    # NOTE: this would only replace the first instance found
+    msg = text if isinstance(text, Message) else parser.parsestr(text)
+    msg.replace_header(AC, header_unwrap(msg.get(AC)))
+    ac_gossip_headers = msg.get_all(AC_GOSSIP)
+    if ac_gossip_headers is not None:
+        for g in ac_gossip_headers:
+            msg[AC_GOSSIP] = header_unwrap(g)
+    return msg.as_string()
+
+
+def gen_ac_gossip_headervalue(addr, keydata):
+    return AC_GOSSIP_HEADER % {ADDR: addr, KEYDATA: keydata}
+
+
+# NOTE: here functions that needs crypo
 
 def gen_ac_email(sender, recipients, p, subject, body, pe=None,
                  keyhandle=None, date=None, _dto=False, message_id=None,
                  boundary=None, _extra=None):
-    """."""
+    """Generate an Autocrypt Email.
+
+    :return: an Autocrypt encrypted Email
+    :rtype: Message
+    """
     if keyhandle is None:
         keyhandle = p._get_keyhandle_from_addr(sender)
     keydata = p.get_public_keydata(keyhandle, b64=True)
 
     data = MIMEText(body)
     enc = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
-    msg = gen_mime_enc_multipart(str(enc), boundary)
+    msg = gen_encrypted_email(str(enc), boundary)
     add_headers(msg, sender, recipients, subject, date, _dto,
                 message_id, _extra)
     add_ac_headers(msg, sender, keydata, pe)
-    logger.debug('Generated Autcrypt Email: \n%s', msg)
+    logger.info('Generated Autcrypt Email: \n%s', msg)
     return msg
 
 
-def decrypt_mime_enc_email(msg, p, key=None):
+def decrypt_email(msg, p, key=None):
     if not isinstance(msg, Message):
         msg = parser.parsestr(msg)
     assert msg.is_multipart()
@@ -246,10 +281,9 @@ def decrypt_mime_enc_email(msg, p, key=None):
     for payload in msg.get_payload():
         if payload.get_content_type() == 'application/octet-stream':
             enc_text = payload.get_payload()
-    logger.debug('RM: key dict %s', key)
-    dec, _ = p.decrypt(enc_text, key)
-    logger.debug('Decrypted Email.')
-    return dec.decode()
+    pt, _ = p.decrypt(enc_text, key)
+    logger.info('Decrypted Email.')
+    return pt.decode()
 
 
 def parse_ac_email(msg, p):
@@ -265,34 +299,18 @@ def parse_ac_email(msg, p):
     logger.debug('Imported keydata from Autcrypt header.')
     key = get_skey_from_msg(msg, p)
 
-    dec = decrypt_mime_enc_email(msg, p, key)
+    pt = decrypt_email(msg, p, key)
     logger.debug('Parsed Autocrypt Email.')
-    return msg, dec
+    return msg, pt
 
 
-def ac_header_email_unwrap_keydata(text):
-    # NOTE: this would not replace the headers, but add new ones
-    msg = parser.parsestr(text)
-    ac_header = msg.get_all(AC)[0]
-    msg[AC] = header_unwrap(ac_header)
-    ac_gossip_headers = msg.get_all(AC_GOSSIP)
-    if ac_gossip_headers is not None:
-        for g in ac_gossip_headers:
-            msg[AC_GOSSIP] = header_unwrap(g)
-    return msg.as_string()
-
-
-def gen_ac_gossip_header(addr, keydata):
-    return AC_GOSSIP_HEADER % {ADDR: addr, KEYDATA: keydata}
-
-
-def gen_ac_gossip_headers(recipients, p):
+def gen_ac_gossip_headervalues(recipients, p):
     gossip_list = []
     for r in recipients:
         logger.debug('Generating Gossip header for recipient:\n%s', r)
         keyhandle = p._get_keyhandle_from_addr(r)
         keydata = p.get_public_keydata(keyhandle, b64=True)
-        g = gen_ac_gossip_header(r, keydata)
+        g = gen_ac_gossip_headervalue(r, keydata)
         gossip_list.append(g)
     return gossip_list
 
@@ -348,7 +366,7 @@ def parse_ac_gossip_email(msg, p):
     logger.debug('Imported keydata from Autocrypt header.')
 
     key = get_skey_from_msg(msg, p)
-    dec_text = decrypt_mime_enc_email(msg, p, key)
+    dec_text = decrypt_email(msg, p, key)
     # NOTE: hacky workaround, because "\n" is added after "; ""
     dec_text = dec_text.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
     open('foo', 'w').write(dec_text)
@@ -362,7 +380,7 @@ def parse_ac_gossip_email(msg, p):
 
 
 def gen_ac_gossip_cleartext_email(recipients, body, p):
-    gossip_headers = gen_ac_gossip_headers(recipients, p)
+    gossip_headers = gen_ac_gossip_headervalues(recipients, p)
     logger.debug('gossip headers %s', gossip_headers)
     msg = MIMEText(body)
     for g in gossip_headers:
@@ -381,7 +399,7 @@ def gen_ac_gossip_email(sender, recipients, p, subject, body, pe=None,
     msg_clear = gen_ac_gossip_cleartext_email(recipients, body, p)
 
     enc = p.sign_encrypt(msg_clear.as_bytes(), keyhandle, recipients)
-    msg = gen_mime_enc_multipart(str(enc), boundary=boundary)
+    msg = gen_encrypted_email(str(enc), boundary=boundary)
     logger.debug(msg)
     add_headers(msg, sender, recipients, subject,
                       date, _dto, message_id, _extra)
@@ -503,8 +521,8 @@ def parse_email(msg, p, passphrase=None):
         return parse_ac_setup_email(msg, p, passphrase)
     elif msg.get(AC) is not None:
         logger.info('Email contains Autocrypt headers.')
-        msg, dec = parse_ac_email(msg, p)
-        if parser.parsestr(dec).get(AC_GOSSIP) is not None:
+        msg, pt = parse_ac_email(msg, p)
+        if parser.parsestr(pt).get(AC_GOSSIP) is not None:
             return parse_ac_gossip_email(msg, p)
     elif msg.get(AC_GOSSIP) is not None:
         logger.info('Email contains Autocrypt Gossip headers.')
