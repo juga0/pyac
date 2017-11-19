@@ -9,34 +9,34 @@ from email.parser import Parser
 from email import policy
 
 from autocrypt.conflog import LOGGING
-from autocrypt.examples_data import (ALICE, BOB, RECIPIENTS, ALICE_KEYDATA,
-                                     BOB_KEYDATA, BOB_GOSSIP, ALICE_AC,
-                                     SUBJECT_GOSSIP, BODY_GOSSIP,
-                                     BOB_KEYDATA_WRAPPED, CLEARTEXT_GOSSIP,
-                                     PASSPHRASE, AC_SETUP_PAYLOAD,
-                                     AC_SETUP_ENC, SUBJECT_AC, BODY_AC)
+from autocrypt.tests_data import (ALICE, BOB, RECIPIENTS, ALICE_KEYDATA,
+                                  BOB_KEYDATA, BOB_GOSSIP, ALICE_AC,
+                                  SUBJECT_GOSSIP, BODY_GOSSIP,
+                                  BOB_KEYDATA_WRAPPED, CLEARTEXT_GOSSIP,
+                                  PASSPHRASE, AC_SETUP_PAYLOAD,
+                                  AC_SETUP_ENC, SUBJECT_AC, BODY_AC)
 
 from autocrypt.constants import (MUTUAL, AC_PASSPHRASE_NUM_BLOCKS,
                                  AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_LEN)
 
 # from autocrypt.pgpycrypto import PGPyCrypto
 
-from autocrypt.pgpymessage import (wrap, header_unwrap,
-                                   gen_ac_headervaluestr,
-                                   gen_ac_email,
-                                   parse_ac_email,
-                                   gen_gossip_headervalue,
-                                   gen_gossip_headervalues,
-                                   parse_gossip_list_from_msg,
-                                   parse_gossip_email,
-                                   gen_gossip_pt_email,
-                                   gen_gossip_email,
-                                   gen_ac_setup_ct,
-                                   gen_ac_setup_passphrase,
-                                   gen_ac_setup_payload,
-                                   gen_ac_setup_email, parse_ac_setup_payload,
-                                   parse_ac_setup_ct,
-                                   parse_ac_setup_email, parse_email)
+from autocrypt.message import (wrap, header_unwrap,
+                               gen_ac_headervaluestr,
+                               gen_ac_email,
+                               parse_ac_email,
+                               gen_gossip_headervalue,
+                               gen_gossip_headervalues,
+                               parse_gossip_list_from_msg,
+                               parse_gossip_email,
+                               gen_gossip_pt_email,
+                               gen_gossip_email,
+                               gen_ac_setup_ct,
+                               gen_ac_setup_passphrase,
+                               gen_ac_setup_payload,
+                               gen_ac_setup_email, parse_ac_setup_payload,
+                               parse_ac_setup_ct,
+                               parse_ac_setup_email, parse_email)
 # unwrap, gen_headervaluestr_from_headervaluedict, header_wrap
 # gen_ac_headerdict, parse_header_value, parse_ac_headers,
 # gen_encrypted_email, add_headers,add_ac_headers, decrypt_email,

@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 import pytest
 
 from autocrypt.constants import KEY_SIZE
-from autocrypt.examples_data import AC_SETUP_ENC, PASSPHRASE
+from autocrypt.tests_data import AC_SETUP_ENC, PASSPHRASE
 
 
 class TestCrypto:
