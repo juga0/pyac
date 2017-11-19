@@ -1,3 +1,8 @@
+0.3.0
+------
+
+- Implement parsing any Email (detect type)
+
 0.2.0
 ------
 
