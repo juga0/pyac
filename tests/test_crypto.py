@@ -38,15 +38,15 @@ class TestCrypto:
 
     def test_list_secret_keyhandles(self, pgpycrypto):
         keyhandle = pgpycrypto.gen_secret_key(emailadr="hello@xyz.org")
-        l = pgpycrypto.list_secret_keyinfos(keyhandle)
-        assert len(l) == 2
-        assert l[0].id == keyhandle
+        keyinfolist = pgpycrypto.list_secret_keyinfos(keyhandle)
+        assert len(keyinfolist) == 2
+        assert keyinfolist[0].id == keyhandle
 
     def test_list_public_keyhandles(self, pgpycrypto):
         keyhandle = pgpycrypto.gen_secret_key(emailadr="hello@xyz.org")
-        l = pgpycrypto.list_public_keyinfos(keyhandle)
-        assert len(l) == 2
-        assert l[0].match(keyhandle)
+        keyinfolist = pgpycrypto.list_public_keyinfos(keyhandle)
+        assert len(keyinfolist) == 2
+        assert keyinfolist[0].match(keyhandle)
 
     @pytest.mark.parametrize("armor", [True, False])
     def test_transfer_key_and_encrypt_decrypt_roundtrip(self, pgpycrypto,
