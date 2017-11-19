@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:expandtab
 
-# import itertools
+import itertools
 import pytest
 from autocrypt.crypto import PGPyCrypto
-from autocrypt.tests_data import PGPHOME
 
 
 @pytest.fixture
@@ -37,29 +36,37 @@ def datadir(request):
 
     return D(request.fspath.dirpath("data"))
 
-#
-# @pytest.fixture
-# def crypto_maker(request, tmpdir):
-#     """Return a function which creates initialized PGPyCrypto instances."""
-    # counter = itertools.count()
-    #
-    # def maker(native=False, pgphome=PGPHOME):
-    #     if pgphome:
-    #         pgpycrypto = PGPyCrypto(pgphome)
-    #     else:
-    #         p = tmpdir.join("pgpycrypto%d" % next(counter))
-    #         pgpycrypto = PGPyCrypto(p.strpath)
-    #     return pgpycrypto
-    # return maker
+
+@pytest.fixture
+def crypto_maker(request, tmpdir, datadir):
+    """Return a function which creates initialized PGPyCrypto instances."""
+    counter = itertools.count()
+
+    def maker(native=False, pgphome=None):
+        if pgphome:
+            p = datadir.join('pgphome')
+        else:
+            p = tmpdir.join("pgpycrypto%d" % next(counter))
+        pgpycrypto = PGPyCrypto(p)
+        return pgpycrypto
+    return maker
 
 
-# @pytest.fixture
-# def pgpycrypto(crypto_maker):
-#     """Return an initialized pgpycrypto instance."""
-    # return crypto_maker()
+@pytest.fixture
+def pgpycrypto(crypto_maker):
+    """Return an initialized pgpycrypto instance."""
+    return crypto_maker()
 
 
-@pytest.fixture(scope="session")
-def pgpycrypto():
-    print(PGPHOME)
-    return PGPyCrypto(PGPHOME)
+@pytest.fixture
+def pgphome_maker(request, datadir):
+    def maker():
+        p = datadir.join('pgphome')
+        pgpycrypto = PGPyCrypto(p)
+        return pgpycrypto
+    return maker
+
+
+@pytest.fixture
+def pcrypto(pgphome_maker):
+    return pgphome_maker()
