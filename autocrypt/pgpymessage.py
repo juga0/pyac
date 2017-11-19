@@ -43,7 +43,7 @@ __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'header_unwrap_keydata', 'gen_gossip_headervalue',
            'gen_gossip_headervalues', 'parse_gossip_list_from_msg',
            'store_keys_from_gossiplist', 'get_seckey_from_msg', 'parse_gossip_email',
-           'gen_gossip_cleartext_email', 'gen_gossip_email',
+           'gen_gossip_pt_email', 'gen_gossip_email',
            'gen_ac_setup_seckey', 'gen_ac_setup_passphrase',
            'gen_ac_setup_enc_seckey', 'gen_ac_setup_email', 'parse_email']
 
@@ -390,7 +390,7 @@ def parse_gossip_email(msg, p):
     return msg, pmsg, gossip_list
 
 
-def gen_gossip_cleartext_email(recipients, body, p):
+def gen_gossip_pt_email(recipients, body, p):
     gossip_headers = gen_gossip_headervalues(recipients, p)
     logger.debug('gossip headers %s', gossip_headers)
     msg = MIMEText(body)
@@ -407,7 +407,7 @@ def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
         keyhandle = p._get_keyhandle_from_addr(sender)
     keydata = p.get_public_keydata(keyhandle, b64=True)
 
-    msg_clear = gen_gossip_cleartext_email(recipients, body, p)
+    msg_clear = gen_gossip_pt_email(recipients, body, p)
 
     enc = p.sign_encrypt(msg_clear.as_bytes(), keyhandle, recipients)
     msg = gen_encrypted_email(str(enc), boundary=boundary)

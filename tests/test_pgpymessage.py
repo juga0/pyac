@@ -38,7 +38,7 @@ from autocrypt.pgpymessage import (wrap, unwrap,
                                    parse_gossip_list_from_msg,
                                    store_keys_from_gossiplist, get_seckey_from_msg,
                                    parse_gossip_email,
-                                   gen_gossip_cleartext_email,
+                                   gen_gossip_pt_email,
                                    gen_gossip_email,
                                    gen_ac_setup_seckey,
                                    gen_ac_setup_passphrase,
@@ -99,9 +99,9 @@ def test_parse_gossip_list_from_msg(pgpycrypto, datadir):
     assert headers == gossip_list
 
 
-def test_gen_gossip_cleartext_email(pgpycrypto, datadir):
+def test_gen_gossip_pt_email(pgpycrypto, datadir):
     text = datadir.read('example-gossip-cleartext_pyac.eml')
-    msg = gen_gossip_cleartext_email(RECIPIENTS, BODY_GOSSIP, pgpycrypto)
+    msg = gen_gossip_pt_email(RECIPIENTS, BODY_GOSSIP, pgpycrypto)
     assert msg.as_string() == CLEARTEXT_GOSSIP
 
 
