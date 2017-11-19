@@ -34,7 +34,7 @@ autocrypt\.constants module
 autocrypt\.examples\_data module
 --------------------------------
 
-.. automodule:: autocrypt.examples_data
+.. automodule:: autocrypt.tests_data
     :members:
     :undoc-members:
     :show-inheritance:
@@ -50,7 +50,7 @@ autocrypt\.keyinfo module
 autocrypt\.pgpycrypto module
 ----------------------------
 
-.. automodule:: autocrypt.pgpycrypto
+.. automodule:: autocrypt.crypto
     :members:
     :undoc-members:
     :show-inheritance:
@@ -58,7 +58,7 @@ autocrypt\.pgpycrypto module
 autocrypt\.pgpymessage module
 -----------------------------
 
-.. automodule:: autocrypt.pgpymessage
+.. automodule:: autocrypt.message
     :members:
     :undoc-members:
     :show-inheritance:
