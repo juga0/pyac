@@ -23,10 +23,10 @@ from autocrypt.constants import (MUTUAL, AC_PASSPHRASE_NUM_BLOCKS,
 
 # from autocrypt.pgpycrypto import PGPyCrypto
 
-from autocrypt.pgpymessage import (keydata_wrap, keydata_unwrap,
+from autocrypt.pgpymessage import (wrap, unwrap,
                                    gen_header_from_dict, header_unwrap,
-                                   header_wrap, gen_ac_header_dict,
-                                   gen_ac_header, parse_header,
+                                   header_wrap, gen_ac_headervaluedict,
+                                   gen_ac_header, parse_header_value,
                                    parse_ac_headers,
                                    gen_mime_enc_multipart,
                                    gen_headers, gen_ac_headers,
@@ -54,9 +54,9 @@ parser = Parser(policy=policy.default)
 # pgpycrypto = PGPyCrypto(PGPHOME)
 
 
-def test_keydata_wrap():
-    keydata_wrapped = keydata_wrap(BOB_KEYDATA, indent='\n ')
-    assert keydata_wrapped == BOB_KEYDATA_WRAPPED
+def test_wrap():
+    wrappedstr = wrap(BOB_KEYDATA, wrapstr='\n ')
+    assert wrappedstr == BOB_KEYDATA_WRAPPED
 
 
 def test_ac_header_wrap():

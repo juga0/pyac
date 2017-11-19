@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 parser = Parser(policy=policy.default)
 
 
-__all__ = ['keydata_wrap', 'keydata_unwrap', 'gen_header_from_dict',
-           'header_unwrap', 'header_wrap', 'gen_ac_header_dict',
-           'gen_ac_header', 'parse_header', 'parse_ac_headers',
+__all__ = ['wrap', 'unwrap', 'gen_header_from_dict',
+           'header_unwrap', 'header_wrap', 'gen_ac_headervaluedict',
+           'gen_ac_header', 'parse_header_value', 'parse_ac_headers',
            'gen_mime_enc_multipart', 'gen_headers', 'gen_ac_headers',
            'gen_ac_email', 'decrypt_mime_enc_email', 'parse_ac_email',
            'ac_header_email_unwrap_keydata', 'gen_ac_gossip_header',
@@ -45,51 +45,99 @@ __all__ = ['keydata_wrap', 'keydata_unwrap', 'gen_header_from_dict',
            'store_gossip_keys', 'get_skey_from_msg', 'parse_ac_gossip_email',
            'gen_ac_gossip_cleartext_email', 'gen_ac_gossip_email',
            'gen_ac_setup_seckey', 'gen_ac_setup_passphrase',
-           'gen_ac_setup_enc_seckey', 'gen_ac_setup_email']
+           'gen_ac_setup_enc_seckey', 'gen_ac_setup_email', 'parse_email']
 
 
-def keydata_wrap(value, maxlen=76, indent=" "):
-    assert "\n" not in value
-    return indent + indent.join([value[0 + i:maxlen + i]
-                                 for i in range(0, len(value), maxlen)])
+def wrap(text, maxlen=76, wrapstr=" "):
+    """Wrap string to maxlen using wrapstr as separator.
+
+    :param text: text to wrap
+    :type text: string
+    :param maxlen: maximum length
+    :type maxlen: integer
+    :param wrapstr: character(s) to wrap the text with
+    :type pe: string
+    :return: wrappedstr text
+    :rtype: string
+    """
+
+    assert "\n" not in text
+    return wrapstr + wrapstr.join([text[0 + i:maxlen + i]
+                                 for i in range(0, len(text), maxlen)])
 
 
-def keydata_unwrap(keydata_wrapped, wrap_char='\n '):
-    return keydata_wrapped.replace(wrap_char, '').strip()
+def unwrap(text, wrapstr='\n '):
+    """Unwrap text wrapped with wrapstr."""
+    return text.replace(wrapstr, '').strip()
 
 
-def gen_header_from_dict(header_dict):
-    return "; ".join(["=".join([k, v]) for k, v in header_dict.items()])
+def gen_header_from_dict(headervaluedict):
+    """Generate Email header value from a dict.
+
+    :return: Email header value in the form: "k=v; k=v;..."
+    :rtype: str
+    """
+    return "; ".join(["=".join([k, v]) for k, v in headervaluedict.items()])
 
 
-def header_unwrap(header, wrap_char="\n "):
-    header_dict = parse_header(header)
-    header_dict['keydata'] = keydata_unwrap(header_dict['keydata'], wrap_char)
-    return gen_header_from_dict(header_dict)
+def parse_header_value(headervaluestr):
+    """Parse an Email header value.
+
+    :param headervaluestr: an Email header value in the form:
+        "addr=...; <prefer-encrypt:; >keydata=..."
+    :type text: string
+    :return: an Email header value dict
+    :rtype: dict
+    """
+    # NOTE: can not just do the following, as keydata may contain "="
+    # headervaluedict = dict([(k.strip(),v.strip()) for k,v in
+    #                     [i.split('=') for i in header.split(';')]])
+    # NOTE: email.mime splits keywords with '\n '
+    header_kv_list = re.split('; |;\n ', headervaluestr)
+    headervaluedict = dict()
+    for kv in header_kv_list:
+        if kv.startswith('addr='):
+            headervaluedict[ADDR] = kv.split('addr=')[1].strip()
+        elif kv.startswith('prefer-encrypt='):
+            headervaluedict[PE] = kv.split('prefer-encrypt=')[1].strip()
+        elif kv.startswith('keydata='):
+            headervaluedict[KEYDATA] = kv.split('keydata=')[1].strip()
+    return headervaluedict
 
 
-def header_wrap(header, maxlen=76, indent=" "):
-    header_dict = parse_header(header)
-    header_dict['keydata'] = keydata_wrap(header_dict['keydata'], maxlen,
-                                          indent)
-    return gen_header_from_dict(header_dict)
+def header_unwrap(headervaluestr, wrapstr="\n "):
+    headervaluedict = parse_header_value(headervaluestr)
+    headervaluedict['keydata'] = unwrap(headervaluedict['keydata'], wrapstr)
+    return gen_header_from_dict(headervaluedict)
 
 
-def gen_ac_header_dict(addr, keydata, pe=None, unwrap=False, wrap_char='\n '):
+def header_wrap(headervaluestr, maxlen=76, wrapstr=" "):
+    headervaluedict = parse_header_value(headervaluestr)
+    headervaluedict['keydata'] = wrap(headervaluedict['keydata'], maxlen, wrapstr)
+    return gen_header_from_dict(headervaluedict)
+
+
+def gen_ac_headervaluedict(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
+    """Generate Autocrypt header dict.
+
+    :return: AC header in the form:
+        {'Autocrypt': 'addr=...; <prefer-encrypt:...>; keydata=...'}
+    :rtype: dict
+    """
     ac_header = gen_ac_header(addr, keydata, pe, True, '\n')
     return {AC: ac_header}
 
 
-def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrap_char='\n '):
-    """Generate Autocrypt header
+def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
+    """Generate Autocrypt Email header string.
 
     :param key: keydata (base 64 encoded public key)
-    :type key: string
+    :type key: string or bytes
     :param addr: e-mail address
     :type addr: string
     :param pe: prefer-encrypt
     :type pe: string
-    :return: Autocrypt header
+    :return: Autocrypt Email header string
     :rtype: string
 
     """
@@ -98,7 +146,7 @@ def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrap_char='\n '):
     if isinstance(keydata, bytes):
         keydata = keydata.decode()
     if unwrap:
-        keydata = keydata_unwrap(keydata, wrap_char)
+        keydata = unwrap(keydata, wrapstr)
     if pe is None or pe == NOPREFERENCE:
         ac_header = AC_HEADER % {ADDR: addr, KEYDATA: keydata}
     else:
@@ -107,28 +155,11 @@ def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrap_char='\n '):
     return ac_header
 
 
-def parse_header(header):
-    # NOTE: can not just do the following, as keydata may contain "="
-    # header_dict = dict([(k.strip(),v.strip()) for k,v in
-    #                     [i.split('=') for i in header.split(';')]])
-    # NOTE: email.mime splits keywords with '\n '
-    header_kv_list = re.split('; |;\n ', header)
-    header_dict = dict()
-    for kv in header_kv_list:
-        if kv.startswith('addr='):
-            header_dict[ADDR] = kv.split('addr=')[1].strip()
-        elif kv.startswith('prefer-encrypt='):
-            header_dict[PE] = kv.split('prefer-encrypt=')[1].strip()
-        elif kv.startswith('keydata='):
-            header_dict[KEYDATA] = kv.split('keydata=')[1].strip()
-    return header_dict
-
-
 def parse_ac_headers(msg):
     if not isinstance(msg, Message):
         msg = parser.parsestr(msg)
     ac_header_list = [v.strip() for k, v in msg.items() if k == AC]
-    return [parse_header(i) for i in ac_header_list]
+    return [parse_header_value(i) for i in ac_header_list]
 
 
 def gen_mime_enc_multipart(mime_enc_body, boundary=None):
@@ -157,17 +188,17 @@ def gen_headers(msg, sender, recipients, subject, date=None, _dto=False,
 
 def gen_ac_headers(msg, sender, keydata, pe):
     ac_header = gen_ac_header(sender, keydata, pe)
-    ac_header_wrapped = header_wrap(ac_header)
+    ac_header_wrappedstr = header_wrap(ac_header)
     # NOTE: maxlinelen and continuation_ws are set to defaults.
     # They should wrap long lines, but the following code wrap only text
     # from "; "
-    # h = Header(ac_header_wrapped, maxlinelen=76, header_name="Autocrypt",
+    # h = Header(ac_header_wrappedstr, maxlinelen=76, header_name="Autocrypt",
     #            continuation_ws=' ')
     # encode works as expected, but then can not add header with linefeed nor
     # carriage return
     # h_encoded = h.encode(splitchars=' ', maxlinelen=76, linesep='\n ')
     # msg['Autocrypt'] = h_encoded
-    msg.add_header("Autocrypt", ac_header_wrapped)
+    msg.add_header("Autocrypt", ac_header_wrappedstr)
     logger.debug('Generated AC headers.')
     return msg
 
@@ -209,11 +240,11 @@ def parse_ac_email(msg, p):
         msg = parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
-        ac_header_dict = ac_headers[0]
+        ac_headervaluedict = ac_headers[0]
     else:
         # TODO: error
         pass
-    p.import_keydata(b64decode(ac_header_dict['keydata']))
+    p.import_keydata(b64decode(ac_headervaluedict['keydata']))
     logger.debug('Imported keydata from Autcrypt header.')
     key = get_skey_from_msg(msg, p)
 
@@ -261,7 +292,7 @@ def parse_ac_gossip_headers(text):
 
 def store_gossip_keys(gossip_list, p):
     for g in gossip_list:
-        g_dict = parse_header(g)
+        g_dict = parse_header_value(g)
         k = g_dict['keydata']
         logger.debug('Import keydata from Gossip header.')
         p.import_keydata(b64decode(k))
@@ -292,11 +323,11 @@ def parse_ac_gossip_email(msg, p):
         msg = parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
-        ac_header_dict = ac_headers[0]
+        ac_headervaluedict = ac_headers[0]
     else:
         # TODO: error
-        ac_header_dict = ac_headers[0]
-    p.import_keydata(b64decode(ac_header_dict['keydata']))
+        ac_headervaluedict = ac_headers[0]
+    p.import_keydata(b64decode(ac_headervaluedict['keydata']))
     logger.debug('Imported keydata from Autocrypt header.')
 
     key = get_skey_from_msg(msg, p)
