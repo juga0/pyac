@@ -377,11 +377,11 @@ def parse_gossip_email(msg, p):
     logger.debug('Imported keydata from Autocrypt header.')
 
     key = get_seckey_from_msg(msg, p)
-    dec_text = decrypt_email(msg, p, key)
+    pt = decrypt_email(msg, p, key)
     # NOTE: hacky workaround, because "\n" is added after "; ""
-    dec_text = dec_text.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
-    open('foo', 'w').write(dec_text)
-    dec_msg = parser.parsestr(dec_text)
+    pt = pt.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
+    open('foo', 'w').write(pt)
+    dec_msg = parser.parsestr(pt)
     logger.debug('dec_msg %s', dec_msg)
     gossip_list = parse_gossip_list_from_msg(dec_msg)
     logger.debug('gossip_list %s', gossip_list)
