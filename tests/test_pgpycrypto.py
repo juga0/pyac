@@ -8,7 +8,8 @@ from __future__ import unicode_literals
 import pytest
 
 from autocrypt.constants import KEY_SIZE
-from autocrypt.examples_data import AC_SETUP_ENC, PASSPHRASE, SETUP_ENC
+from autocrypt.examples_data import AC_SETUP_ENC, PASSPHRASE
+
 
 class TestCrypto:
     def test_gen_key_and_get_keydata(self, pgpycrypto):
@@ -83,7 +84,6 @@ class TestCrypto:
         i = min(len(keyhandle_verified), len(keyhandle))
         assert keyhandle[-i:] == keyhandle_verified[-i:]
 
-
     def test_sym_decrypt(self, pgpycrypto, datadir):
         pmsg = pgpycrypto.sym_decrypt(AC_SETUP_ENC, PASSPHRASE)
         # NOTE: this is needed because the blob was not originally encrypted
@@ -94,8 +94,8 @@ class TestCrypto:
         ptlist.insert(1, 'Version: PGPy v0.4.3')
         pt = "\n".join(ptlist)
         assert pt == \
-            datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
-
+            datadir.read(
+                'example-setup-message-cleartext-pyac.key').rstrip('\n')
 
     def test_sym_encrypt_decrypt(self, pgpycrypto, datadir):
         pt = datadir.read('example-setup-message-cleartext-pyac.key')

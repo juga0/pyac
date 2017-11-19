@@ -10,13 +10,11 @@ import logging
 import logging.config
 import random
 import re
-import sys
 
 from base64 import b64decode
 from email import policy
 from email.mime.text import MIMEText
 from email.message import Message
-# from email.header import Header
 from email.parser import Parser
 
 from emailpgp.mime.multipartpgp import MIMEMultipartPGP
@@ -42,7 +40,8 @@ __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'gen_ac_email', 'decrypt_email', 'parse_ac_email',
            'header_unwrap_keydata', 'gen_gossip_headervalue',
            'gen_gossip_headervalues', 'parse_gossip_list_from_msg',
-           'store_keys_from_gossiplist', 'get_seckey_from_msg', 'parse_gossip_email',
+           'store_keys_from_gossiplist', 'get_seckey_from_msg',
+           'parse_gossip_email',
            'gen_gossip_pt_email', 'gen_gossip_email',
            'gen_ac_setup_ct', 'gen_ac_setup_passphrase',
            'gen_ac_setup_payload', 'gen_ac_setup_email', 'parse_email']
@@ -63,7 +62,7 @@ def wrap(text, maxlen=76, wrapstr=" "):
 
     assert "\n" not in text
     return wrapstr + wrapstr.join([text[0 + i:maxlen + i]
-                                 for i in range(0, len(text), maxlen)])
+                                   for i in range(0, len(text), maxlen)])
 
 
 def unwrap(text, wrapstr='\n '):
@@ -113,7 +112,8 @@ def header_unwrap(headervaluestr, wrapstr="\n "):
 
 def header_wrap(headervaluestr, maxlen=76, wrapstr=" "):
     headervaluedict = parse_header_value(headervaluestr)
-    headervaluedict['keydata'] = wrap(headervaluedict['keydata'], maxlen, wrapstr)
+    headervaluedict['keydata'] = wrap(
+        headervaluedict['keydata'], maxlen, wrapstr)
     return gen_headervaluestr_from_headervaluedict(headervaluedict)
 
 
@@ -369,7 +369,8 @@ def parse_gossip_ct(msg, p, key=None):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     pt = decrypt_email(msg, p, key)
     # NOTE: hacky workaround, because "\n" is added after "; ""
-    pt = pt.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
+    pt = pt.replace(
+        ";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
     open('foo', 'w').write(pt)
     pmsg = parser.parsestr(pt)
     gossip_list = parse_gossip_list_from_msg(pmsg)
@@ -404,8 +405,8 @@ def gen_gossip_pt_email(recipients, body, p):
 
 
 def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
-                        keyhandle=None, date=None, _dto=False, message_id=None,
-                        boundary=None, _extra=None):
+                     keyhandle=None, date=None, _dto=False, message_id=None,
+                     boundary=None, _extra=None):
     """."""
     if keyhandle is None:
         keyhandle = p._get_keyhandle_from_addr(sender)
@@ -416,10 +417,10 @@ def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
     pgpymsg = p.sign_encrypt(pmsg.as_bytes(), keyhandle, recipients)
     cmsg = gen_encrypted_email(str(pgpymsg), boundary=boundary)
     add_headers(cmsg, sender, recipients, subject,
-                      date, _dto, message_id, _extra)
+                date, _dto, message_id, _extra)
     add_ac_headers(cmsg, sender, keydata, pe)
     logger.info('Generated Autocrypt Gossip Email:\n{}'.
-                 format(cmsg.as_string()))
+                format(cmsg.as_string()))
     logger.info('Decrypted:\n{}'.format(pmsg.as_string()))
     return cmsg
 
@@ -437,10 +438,10 @@ def gen_ac_setup_ct(sender, pe, p, keyhandle=None):
 def gen_ac_setup_passphrase():
     numbers = [str(random.randrange(0, 9))
                for i in range(0, AC_PASSPHRASE_LEN)]
-    passphrase = "-".join(["".join(numbers[0+i:AC_PASSPHRASE_WORD_LEN+i])
+    passphrase = "-".join(["".join(numbers[0 + i:AC_PASSPHRASE_WORD_LEN + i])
                            for i in range(0, AC_PASSPHRASE_NUM_WORDS)])
     len_block = (len(passphrase) + 1) // AC_PASSPHRASE_NUM_BLOCKS
-    passphrase_blocks_list = [passphrase[0+i:len_block+i]
+    passphrase_blocks_list = [passphrase[0 + i:len_block + i]
                               for i in range(0, len(passphrase), len_block)]
     passphrase_blocks = "\n".join(passphrase_blocks_list)
     logger.info(passphrase_blocks)
@@ -451,8 +452,8 @@ def gen_ac_setup_payload(ac_setup_ct, passphrase, p):
     ct = p.sym_encrypt(ac_setup_ct, passphrase)
     ctlist = str(ct).split('\n')
     ctlist.insert(2, AC_PASSPHRASE_FORMAT + "\n" +
-                       AC_PASSPHRASE_BEGIN +
-                       passphrase[:AC_PASSPHRASE_BEGIN_LEN])
+                  AC_PASSPHRASE_BEGIN +
+                  passphrase[:AC_PASSPHRASE_BEGIN_LEN])
     ac_setup_ct = "\n".join(ctlist)
     return AC_SETUP_INTRO + "\n" + ac_setup_ct
 
@@ -463,7 +464,7 @@ def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
     passphrase = passphrase or gen_ac_setup_passphrase()
     ac_setup_ct = gen_ac_setup_ct(sender, pe, p, keyhandle)
     ac_setup_payload = gen_ac_setup_payload(ac_setup_ct,
-                                                  passphrase, p)
+                                            passphrase, p)
     msg = MIMEMultipartACSetup(ac_setup_payload, boundary=boundary)
     if _extra is None:
         _extra = {}

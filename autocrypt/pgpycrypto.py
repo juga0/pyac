@@ -285,7 +285,7 @@ class PGPyCrypto(object):
                                             date_created=k.created))
         return keyinfos
 
-    def list_packets(self, keydata):
+    def list_packets_pgpy(self, keydata):
         if isinstance(keydata, bytes):
             data = bytearray(keydata)
         elif isinstance(keydata, str):
@@ -377,7 +377,7 @@ class PGPyCrypto(object):
                 key = self._get_key_from_addr(r)
                 pkey = key if key.is_public else key.pubkey
                 cmsg = pkey.encrypt(cmsg, cipher=cipher,
-                                       sessionkey=sessionkey)
+                                    sessionkey=sessionkey)
             del sessionkey
         assert cmsg.is_encrypted
         return str(cmsg)
