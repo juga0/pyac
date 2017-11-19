@@ -24,12 +24,12 @@ from autocrypt.constants import (MUTUAL, AC_PASSPHRASE_NUM_BLOCKS,
 # from autocrypt.pgpycrypto import PGPyCrypto
 
 from autocrypt.pgpymessage import (wrap, unwrap,
-                                   gen_header_from_dict, header_unwrap,
-                                   header_wrap, gen_ac_headervaluedict,
-                                   gen_ac_header, parse_header_value,
+                                   gen_headervaluestr_from_headervaluedict, header_unwrap,
+                                   header_wrap, gen_ac_headerdict,
+                                   gen_ac_headervaluestr, parse_header_value,
                                    parse_ac_headers,
                                    gen_mime_enc_multipart,
-                                   gen_headers, gen_ac_headers,
+                                   add_headers, add_ac_headers,
                                    gen_ac_email, decrypt_mime_enc_email,
                                    parse_ac_email,
                                    ac_header_email_unwrap_keydata,
@@ -63,8 +63,8 @@ def test_ac_header_wrap():
     pass
 
 
-def test_gen_ac_header():
-    h = gen_ac_header(ALICE, ALICE_KEYDATA, MUTUAL)
+def test_gen_ac_headervaluestr():
+    h = gen_ac_headervaluestr(ALICE, ALICE_KEYDATA, MUTUAL)
     assert h == header_unwrap(ALICE_AC)
 
 

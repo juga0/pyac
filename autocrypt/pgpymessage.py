@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 parser = Parser(policy=policy.default)
 
 
-__all__ = ['wrap', 'unwrap', 'gen_header_from_dict',
-           'header_unwrap', 'header_wrap', 'gen_ac_headervaluedict',
-           'gen_ac_header', 'parse_header_value', 'parse_ac_headers',
-           'gen_mime_enc_multipart', 'gen_headers', 'gen_ac_headers',
+__all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
+           'header_unwrap', 'header_wrap', 'gen_ac_headerdict',
+           'gen_ac_headervaluestr', 'parse_header_value', 'parse_ac_headers',
+           'gen_mime_enc_multipart', 'add_headers', 'add_ac_headers',
            'gen_ac_email', 'decrypt_mime_enc_email', 'parse_ac_email',
            'ac_header_email_unwrap_keydata', 'gen_ac_gossip_header',
            'gen_ac_gossip_headers', 'parse_ac_gossip_headers',
@@ -71,7 +71,7 @@ def unwrap(text, wrapstr='\n '):
     return text.replace(wrapstr, '').strip()
 
 
-def gen_header_from_dict(headervaluedict):
+def gen_headervaluestr_from_headervaluedict(headervaluedict):
     """Generate Email header value from a dict.
 
     :return: Email header value in the form: "k=v; k=v;..."
@@ -108,27 +108,16 @@ def parse_header_value(headervaluestr):
 def header_unwrap(headervaluestr, wrapstr="\n "):
     headervaluedict = parse_header_value(headervaluestr)
     headervaluedict['keydata'] = unwrap(headervaluedict['keydata'], wrapstr)
-    return gen_header_from_dict(headervaluedict)
+    return gen_headervaluestr_from_headervaluedict(headervaluedict)
 
 
 def header_wrap(headervaluestr, maxlen=76, wrapstr=" "):
     headervaluedict = parse_header_value(headervaluestr)
     headervaluedict['keydata'] = wrap(headervaluedict['keydata'], maxlen, wrapstr)
-    return gen_header_from_dict(headervaluedict)
+    return gen_headervaluestr_from_headervaluedict(headervaluedict)
 
 
-def gen_ac_headervaluedict(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
-    """Generate Autocrypt header dict.
-
-    :return: AC header in the form:
-        {'Autocrypt': 'addr=...; <prefer-encrypt:...>; keydata=...'}
-    :rtype: dict
-    """
-    ac_header = gen_ac_header(addr, keydata, pe, True, '\n')
-    return {AC: ac_header}
-
-
-def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
+def gen_ac_headervaluestr(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
     """Generate Autocrypt Email header string.
 
     :param key: keydata (base 64 encoded public key)
@@ -137,7 +126,8 @@ def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
     :type addr: string
     :param pe: prefer-encrypt
     :type pe: string
-    :return: Autocrypt Email header string
+    :return: Autocrypt Email header string in the form:
+        {'Autocrypt': 'addr=...; <prefer-encrypt:...>; keydata=...'}
     :rtype: string
 
     """
@@ -155,21 +145,41 @@ def gen_ac_header(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
     return ac_header
 
 
+def gen_ac_headerdict(addr, keydata, pe=None, unwrap=False, wrapstr='\n '):
+    """Generate Autocrypt header dict.
+
+    :return: AC header in the form:
+        {'Autocrypt': 'addr=...; <prefer-encrypt:...>; keydata=...'}
+    :rtype: dict
+    """
+    ac_header = gen_ac_headervaluestr(addr, keydata, pe, True, '\n')
+    return {AC: ac_header}
+
+
 def parse_ac_headers(msg):
+    """Parse an Email and return a list of Autcrypt header values as dict.
+
+    :param msg: an Email
+    :type msg: string or Message
+    :return: list of Autcrypt header values as dict in the form:
+        [{'addr': ..., 'keydata':...}, {'addr': ..., 'keydata':...},]
+    :rtype: list
+    """
     if not isinstance(msg, Message):
         msg = parser.parsestr(msg)
     ac_header_list = [v.strip() for k, v in msg.items() if k == AC]
     return [parse_header_value(i) for i in ac_header_list]
 
 
-def gen_mime_enc_multipart(mime_enc_body, boundary=None):
-    msg = MIMEMultipartPGP(mime_enc_body, boundary=boundary)
-    logger.debug('Generated encrypted multipart body.')
-    return msg
-
-
-def gen_headers(msg, sender, recipients, subject, date=None, _dto=False,
+def add_headers(msg, sender, recipients, subject, date=None, _dto=False,
                 message_id=None, _extra=None):
+    """Generate Email headers.
+
+    :param msg: an Email Message
+    :type msg: Message
+    :return: an Email with headers
+    :rtype: Message
+    """
     logger.debug("Generating headers.")
     if _dto:
         msg["Delivered-To"] = recipients[0]
@@ -184,10 +194,11 @@ def gen_headers(msg, sender, recipients, subject, date=None, _dto=False,
         for name, value in _extra.items():
             msg.add_header(name, value)
     logger.debug('Generated headers.')
+    return msg
 
 
-def gen_ac_headers(msg, sender, keydata, pe):
-    ac_header = gen_ac_header(sender, keydata, pe)
+def add_ac_headers(msg, sender, keydata, pe):
+    ac_header = gen_ac_headervaluestr(sender, keydata, pe)
     ac_header_wrappedstr = header_wrap(ac_header)
     # NOTE: maxlinelen and continuation_ws are set to defaults.
     # They should wrap long lines, but the following code wrap only text
@@ -198,8 +209,14 @@ def gen_ac_headers(msg, sender, keydata, pe):
     # carriage return
     # h_encoded = h.encode(splitchars=' ', maxlinelen=76, linesep='\n ')
     # msg['Autocrypt'] = h_encoded
-    msg.add_header("Autocrypt", ac_header_wrappedstr)
+    msg.add_header(AC, ac_header_wrappedstr)
     logger.debug('Generated AC headers.')
+    return msg
+
+
+def gen_mime_enc_multipart(mime_enc_body, boundary=None):
+    msg = MIMEMultipartPGP(mime_enc_body, boundary=boundary)
+    logger.debug('Generated encrypted multipart body.')
     return msg
 
 
@@ -214,9 +231,9 @@ def gen_ac_email(sender, recipients, p, subject, body, pe=None,
     data = MIMEText(body)
     enc = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
     msg = gen_mime_enc_multipart(str(enc), boundary)
-    gen_headers(msg, sender, recipients, subject, date, _dto,
+    add_headers(msg, sender, recipients, subject, date, _dto,
                 message_id, _extra)
-    gen_ac_headers(msg, sender, keydata, pe)
+    add_ac_headers(msg, sender, keydata, pe)
     logger.debug('Generated Autcrypt Email: \n%s', msg)
     return msg
 
@@ -366,9 +383,9 @@ def gen_ac_gossip_email(sender, recipients, p, subject, body, pe=None,
     enc = p.sign_encrypt(msg_clear.as_bytes(), keyhandle, recipients)
     msg = gen_mime_enc_multipart(str(enc), boundary=boundary)
     logger.debug(msg)
-    gen_headers(msg, sender, recipients, subject,
+    add_headers(msg, sender, recipients, subject,
                       date, _dto, message_id, _extra)
-    gen_ac_headers(msg, sender, keydata, pe)
+    add_ac_headers(msg, sender, keydata, pe)
     return msg
 
 
@@ -416,7 +433,7 @@ def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
     if _extra is None:
         _extra = {}
     _extra.update({AC_SETUP_MSG: LEVEL_NUMBER})
-    gen_headers(msg, sender, [sender], subject,
+    add_headers(msg, sender, [sender], subject,
                 date, _dto, message_id, _extra)
     logger.debug('Generated multipart AC Setup body.')
     return msg
