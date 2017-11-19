@@ -81,7 +81,7 @@ def test_gen_ac_email(pgpycrypto, datadir):
 
 def test_parse_ac_email(pgpycrypto, datadir):
     text = datadir.read('example-simple-autocrypt-pyac.eml')
-    msg, pt = parse_ac_email(text, pgpycrypto)
+    pt = parse_ac_email(text, pgpycrypto)
     # NOTE: the following is needed cause decrypt returns pt to have
     # same API as bingpg
     assert parser.parsestr(pt).get_payload() == BODY_AC
@@ -121,8 +121,8 @@ def test_gen_gossip_email(pgpycrypto, datadir):
 
 def test_parse_gossip_email(pgpycrypto, datadir):
     text = datadir.read('example-gossip_pyac.eml')
-    msg, pmsg, gossip = parse_gossip_email(text, pgpycrypto)
-    assert pmsg.as_string() == \
+    pt = parse_gossip_email(text, pgpycrypto)
+    assert pt == \
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
 
@@ -135,9 +135,8 @@ def test_gen_parse_gossip_email(pgpycrypto, datadir):
                               '<gossip-example@autocrypt.example>',
                               'PLdq3hBodDceBdiavo4rbQeh0u8JfdUHL')
 
-    msg, pmsg, gossip = parse_gossip_email(msg.as_string(),
-                                                 pgpycrypto)
-    assert pmsg.as_string() + '\n' == \
+    pt = parse_gossip_email(msg.as_string(), pgpycrypto)
+    assert pt + '\n' == \
         datadir.read('example-gossip-cleartext_pyac.eml')
 
 
@@ -223,12 +222,12 @@ def test_parse_email(pgpycrypto, datadir):
         datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
 
     text = datadir.read('example-gossip_pyac.eml')
-    msg, pmsg, gossip = parse_email(text, pgpycrypto)
-    assert pmsg.as_string() == \
+    pt = parse_email(text, pgpycrypto)
+    assert pt == \
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
     text = datadir.read('example-simple-autocrypt-pyac.eml')
-    msg, pt = parse_ac_email(text, pgpycrypto)
+    pt = parse_ac_email(text, pgpycrypto)
     # NOTE: the following is needed cause decrypt returns pt to have
     # same API as bingpg
     assert parser.parsestr(pt).get_payload() == BODY_AC
