@@ -246,11 +246,12 @@ def header_unwrap_keydata(text):
 
 
 def gen_ac_gossip_headervalue(addr, keydata):
+    """Generate Autocrypt Gossip header string."""
     return AC_GOSSIP_HEADER % {ADDR: addr, KEYDATA: keydata}
 
 
-# NOTE: here functions that needs crypo
-
+# NOTE: from here functions that needs crypo
+##############################################
 def gen_ac_email(sender, recipients, p, subject, body, pe=None,
                  keyhandle=None, date=None, _dto=False, message_id=None,
                  boundary=None, _extra=None):
@@ -274,6 +275,11 @@ def gen_ac_email(sender, recipients, p, subject, body, pe=None,
 
 
 def decrypt_email(msg, p, key=None):
+    """Decrypt Email.
+
+    :return: decrypted Email text
+    :rtype: str
+    """
     if not isinstance(msg, Message):
         msg = parser.parsestr(msg)
     assert msg.is_multipart()
@@ -287,6 +293,11 @@ def decrypt_email(msg, p, key=None):
 
 
 def parse_ac_email(msg, p):
+    """Parse an Autocrypt Email.
+
+    :return: an Autocrypt Email Message and decrypted body
+    :rtype: Message, str
+    """
     if not isinstance(msg, Message):
         msg = parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
@@ -294,17 +305,23 @@ def parse_ac_email(msg, p):
         ac_headervaluedict = ac_headers[0]
     else:
         # TODO: error
-        pass
+        logger.error('There is more than one Autocrypt header.')
     p.import_keydata(b64decode(ac_headervaluedict['keydata']))
     logger.debug('Imported keydata from Autcrypt header.')
     key = get_skey_from_msg(msg, p)
 
     pt = decrypt_email(msg, p, key)
-    logger.debug('Parsed Autocrypt Email.')
+    logger.info('Parsed Autocrypt Email.')
     return msg, pt
 
 
 def gen_ac_gossip_headervalues(recipients, p):
+    """Generate Autcrypt Gossip header values.
+
+    :return: Autcrypt Gossip header values in the form:
+        ['addr=...; keydata=...', 'addr=...; keydata=...']
+    :rtype: list
+    """
     gossip_list = []
     for r in recipients:
         logger.debug('Generating Gossip header for recipient:\n%s', r)
