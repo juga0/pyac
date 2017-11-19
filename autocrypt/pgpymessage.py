@@ -165,8 +165,7 @@ def parse_ac_headers(msg):
         [{'addr': ..., 'keydata':...}, {'addr': ..., 'keydata':...},]
     :rtype: list
     """
-    if not isinstance(msg, Message):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     ac_header_list = [v.strip() for k, v in msg.items() if k == AC]
     return [parse_header_value(i) for i in ac_header_list]
 
@@ -280,8 +279,7 @@ def decrypt_email(msg, p, key=None):
     :return: decrypted Email text
     :rtype: str
     """
-    if not isinstance(msg, Message):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     assert msg.is_multipart()
     assert msg.get_content_subtype() == "encrypted"
     for payload in msg.get_payload():
@@ -298,8 +296,7 @@ def parse_ac_email(msg, p):
     :return: an Autocrypt Email Message and decrypted body
     :rtype: Message, str
     """
-    if not isinstance(msg, Message):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
         ac_headervaluedict = ac_headers[0]
@@ -332,12 +329,14 @@ def gen_ac_gossip_headervalues(recipients, p):
     return gossip_list
 
 
-def parse_ac_gossip_headers(text):
-    if not isinstance(text, Message):
-        msg = parser.parsestr(text)
-    else:
-        msg = text
-    # when
+def parse_ac_gossip_headers(msg):
+    """Parse Autcrypt Gossip header values from Email.
+
+    :return: Autcrypt Gossip header values in the form:
+        ['addr=...; keydata=...', 'addr=...; keydata=...']
+    :rtype: list
+    """
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     gossip_list = [v.strip() for k, v in msg.items() if k == AC_GOSSIP]
     return gossip_list
 
@@ -350,12 +349,8 @@ def store_gossip_keys(gossip_list, p):
         p.import_keydata(b64decode(k))
 
 
-def get_skey_from_msg(text, p):
-    if isinstance(text, str):
-        msg = parser.parsestr(text)
-    else:
-        msg = text
-
+def get_skey_from_msg(msg, p):
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     for recipient in msg['To'].split(', '):
         key = p._get_key_from_addr(recipient)
         if key is not None:
@@ -371,8 +366,7 @@ def get_skey_from_msg(text, p):
 
 
 def parse_ac_gossip_email(msg, p):
-    if isinstance(msg, str):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
         ac_headervaluedict = ac_headers[0]
@@ -475,8 +469,7 @@ def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
 
 
 def parse_ac_setup_header(msg):
-    if isinstance(msg, str):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     return msg.get(AC_SETUP_MSG)
 
 
@@ -514,8 +507,7 @@ def parse_ac_setup_payload(payload):
 
 
 def parse_ac_setup_email(msg, p, passphrase):
-    if isinstance(msg, str):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     if msg.get(AC_SETUP_MSG) != LEVEL_NUMBER:
         logger.error('This is not an Autocrypt Setup Message v1')
     description, payload = msg.get_payload()
@@ -529,8 +521,7 @@ def parse_ac_setup_email(msg, p, passphrase):
 
 
 def parse_email(msg, p, passphrase=None):
-    if isinstance(msg, str):
-        msg = parser.parsestr(msg)
+    msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     if msg.get(AC_SETUP_MSG) == LEVEL_NUMBER:
         logger.info('Email is an Autocrypt Setup Message.')
         if passphrase is None:
