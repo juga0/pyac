@@ -264,8 +264,8 @@ def gen_ac_email(sender, recipients, p, subject, body, pe=None,
     keydata = p.get_public_keydata(keyhandle, b64=True)
 
     data = MIMEText(body)
-    enc = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
-    msg = gen_encrypted_email(str(enc), boundary)
+    cmsg = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
+    msg = gen_encrypted_email(str(cmsg), boundary)
     add_headers(msg, sender, recipients, subject, date, _dto,
                 message_id, _extra)
     add_ac_headers(msg, sender, keydata, pe)
@@ -284,8 +284,8 @@ def decrypt_email(msg, p, key=None):
     assert msg.get_content_subtype() == "encrypted"
     for payload in msg.get_payload():
         if payload.get_content_type() == 'application/octet-stream':
-            enc_text = payload.get_payload()
-    pt, _ = p.decrypt(enc_text, key)
+            ct = payload.get_payload()
+    pt, _ = p.decrypt(ct, key)
     logger.info('Decrypted Email.')
     return pt.decode()
 
@@ -407,15 +407,14 @@ def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
         keyhandle = p._get_keyhandle_from_addr(sender)
     keydata = p.get_public_keydata(keyhandle, b64=True)
 
-    msg_clear = gen_gossip_pt_email(recipients, body, p)
+    pmsg = gen_gossip_pt_email(recipients, body, p)
 
-    enc = p.sign_encrypt(msg_clear.as_bytes(), keyhandle, recipients)
-    msg = gen_encrypted_email(str(enc), boundary=boundary)
-    logger.debug(msg)
-    add_headers(msg, sender, recipients, subject,
+    pgpymsg = p.sign_encrypt(pmsg.as_bytes(), keyhandle, recipients)
+    cmsg = gen_encrypted_email(str(pgpymsg), boundary=boundary)
+    add_headers(cmsg, sender, recipients, subject,
                       date, _dto, message_id, _extra)
-    add_ac_headers(msg, sender, keydata, pe)
-    return msg
+    add_ac_headers(cmsg, sender, keydata, pe)
+    return cmsg
 
 
 def gen_ac_setup_seckey(sender, pe, p, keyhandle=None):
@@ -442,13 +441,13 @@ def gen_ac_setup_passphrase():
 
 
 def gen_ac_setup_enc_seckey(ac_setup_seckey, passphrase, p):
-    encmsg = p.sym_encrypt(ac_setup_seckey, passphrase)
-    encmsg_list = str(encmsg).split('\n')
-    encmsg_list.insert(2, AC_PASSPHRASE_FORMAT + "\n" +
+    ct = p.sym_encrypt(ac_setup_seckey, passphrase)
+    ctlist = str(ct).split('\n')
+    ctlist.insert(2, AC_PASSPHRASE_FORMAT + "\n" +
                        AC_PASSPHRASE_BEGIN +
                        passphrase[:AC_PASSPHRASE_BEGIN_LEN])
-    ac_setup_enctext = "\n".join(encmsg_list)
-    return AC_SETUP_INTRO + "\n" + ac_setup_enctext
+    ac_setup_ct = "\n".join(ctlist)
+    return AC_SETUP_INTRO + "\n" + ac_setup_ct
 
 
 def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
@@ -473,20 +472,20 @@ def parse_ac_setup_header(msg):
     return msg.get(AC_SETUP_MSG)
 
 
-def parse_ac_setup_enc_part(enctext, passphrase, p):
-    enctext_list = enctext.split('\n')
-    pass_format = enctext_list.pop(2)
+def parse_ac_setup_enc_part(ct, passphrase, p):
+    ctlist = ct.split('\n')
+    pass_format = ctlist.pop(2)
     if pass_format != AC_PASSPHRASE_FORMAT:
         logger.error('Passphrase format not found.')
-    pass_begins = enctext_list.pop(2)
+    pass_begins = ctlist.pop(2)
     if pass_begins[:len(AC_PASSPHRASE_BEGIN)] != AC_PASSPHRASE_BEGIN:
         logger.error('{} not found.'.format(AC_PASSPHRASE_BEGIN))
     if pass_begins[AC_PASSPHRASE_BEGIN_LEN:] != \
             passphrase[:AC_PASSPHRASE_BEGIN_LEN]:
         logger.error('The passphrase is invalid.')
-    logger.debug('Encrypted part without headers %s', "\n".join(enctext_list))
-    plainmsg = p.sym_decrypt("\n".join(enctext_list), passphrase)
-    return plainmsg
+    logger.debug('Encrypted part without headers %s', "\n".join(ctlist))
+    pmsg = p.sym_decrypt("\n".join(ctlist), passphrase)
+    return pmsg
 
 
 def parse_ac_setup_payload(payload):
@@ -501,9 +500,9 @@ def parse_ac_setup_payload(payload):
     bodytext = attachment_text[:enc_starts]
     logger.info(bodytext)
     enc_ends = attachment_text.find('-----END PGP MESSAGE-----')
-    enctext = attachment_text[enc_starts:enc_ends] + '-----END PGP MESSAGE-----'
-    logger.debug('enctext %s', enctext)
-    return enctext
+    ct = attachment_text[enc_starts:enc_ends] + '-----END PGP MESSAGE-----'
+    logger.debug('ct %s', ct)
+    return ct
 
 
 def parse_ac_setup_email(msg, p, passphrase):
@@ -513,11 +512,11 @@ def parse_ac_setup_email(msg, p, passphrase):
     description, payload = msg.get_payload()
     logger.info(description.as_string())
 
-    enctext = parse_ac_setup_payload(payload)
-    plainmsg = parse_ac_setup_enc_part(enctext, passphrase, p)
-    p.import_keydata(plainmsg.message)
+    ct = parse_ac_setup_payload(payload)
+    pmsg = parse_ac_setup_enc_part(ct, passphrase, p)
+    p.import_keydata(pmsg.message)
     logger.info('Secret key imported.')
-    return plainmsg
+    return pmsg
 
 
 def parse_email(msg, p, passphrase=None):

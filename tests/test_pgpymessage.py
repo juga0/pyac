@@ -82,7 +82,7 @@ def test_gen_ac_email(pgpycrypto, datadir):
 def test_parse_ac_email(pgpycrypto, datadir):
     text = datadir.read('example-simple-autocrypt-pyac.eml')
     msg, pt = parse_ac_email(text, pgpycrypto)
-    # NOTE: the following is needed cause decrypt returns plaintext to have
+    # NOTE: the following is needed cause decrypt returns pt to have
     # same API as bingpg
     assert parser.parsestr(pt).get_payload() == BODY_AC
 
@@ -178,49 +178,49 @@ def test_gen_ac_setup_email(pgpycrypto, datadir):
 
 
 def test_parse_ac_setup_payload(pgpycrypto):
-    enctext = parse_ac_setup_payload(AC_SETUP_PAYLOAD)
-    assert AC_SETUP_ENC == enctext + '\n'
+    ct = parse_ac_setup_payload(AC_SETUP_PAYLOAD)
+    assert AC_SETUP_ENC == ct + '\n'
 
 
 def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
-    plainmsg = parse_ac_setup_enc_part(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
+    pmsg = parse_ac_setup_enc_part(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
     # NOTE: this is needed because the blob was not originally encrypted
     # with PGPy. It'll fail with other PGPy versions
-    pt = plainmsg.message
+    pt = pmsg.message
     pt = pt.replace('\r\n', '\n').rstrip('\n')
     ptlist = pt.split('\n')
     ptlist.insert(1, 'Version: PGPy v0.4.3')
     pt = "\n".join(ptlist)
-    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
-    assert pt == plaintext.rstrip('\n')
+    assert pt == \
+        datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
 
 
 def test_parse_ac_setup_email(pgpycrypto, datadir):
-    enctext = datadir.read('example-setup-message-pyac.eml')
-    plainmsg = parse_ac_setup_email(enctext, pgpycrypto, PASSPHRASE)
+    ct = datadir.read('example-setup-message-pyac.eml')
+    pmsg = parse_ac_setup_email(ct, pgpycrypto, PASSPHRASE)
     # NOTE: this is needed because the blob was not originally encrypted
     # with PGPy. It'll fail with other PGPy versions
-    pt = plainmsg.message
+    pt = pmsg.message
     pt = pt.replace('\r\n', '\n').rstrip('\n')
     ptlist = pt.split('\n')
     ptlist.insert(1, 'Version: PGPy v0.4.3')
     pt = "\n".join(ptlist)
-    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
-    assert pt == plaintext.rstrip('\n')
+    assert pt == \
+        datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
 
 
 def test_parse_email(pgpycrypto, datadir):
-    enctext = datadir.read('example-setup-message-pyac.eml')
-    plainmsg = parse_email(enctext, pgpycrypto, PASSPHRASE)
+    ct = datadir.read('example-setup-message-pyac.eml')
+    pmsg = parse_email(ct, pgpycrypto, PASSPHRASE)
     # NOTE: this is needed because the blob was not originally encrypted
     # with PGPy. It'll fail with other PGPy versions
-    pt = plainmsg.message
+    pt = pmsg.message
     pt = pt.replace('\r\n', '\n').rstrip('\n')
     ptlist = pt.split('\n')
     ptlist.insert(1, 'Version: PGPy v0.4.3')
     pt = "\n".join(ptlist)
-    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
-    assert pt == plaintext.rstrip('\n')
+    assert pt == \
+        datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
 
     text = datadir.read('example-gossip_pyac.eml')
     msg, pmsg, gossip = parse_email(text, pgpycrypto)
@@ -229,6 +229,6 @@ def test_parse_email(pgpycrypto, datadir):
 
     text = datadir.read('example-simple-autocrypt-pyac.eml')
     msg, pt = parse_ac_email(text, pgpycrypto)
-    # NOTE: the following is needed cause decrypt returns plaintext to have
+    # NOTE: the following is needed cause decrypt returns pt to have
     # same API as bingpg
     assert parser.parsestr(pt).get_payload() == BODY_AC

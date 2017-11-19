@@ -85,21 +85,21 @@ class TestCrypto:
 
 
     def test_sym_decrypt(self, pgpycrypto, datadir):
-        plainmsg = pgpycrypto.sym_decrypt(AC_SETUP_ENC, PASSPHRASE)
+        pmsg = pgpycrypto.sym_decrypt(AC_SETUP_ENC, PASSPHRASE)
         # NOTE: this is needed because the blob was not originally encrypted
         # with PGPy. It'll fail with other PGPy versions
-        pt = plainmsg.message
+        pt = pmsg.message
         pt = pt.replace('\r\n', '\n').rstrip('\n')
         ptlist = pt.split('\n')
         ptlist.insert(1, 'Version: PGPy v0.4.3')
         pt = "\n".join(ptlist)
-        plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
-        assert pt == plaintext.rstrip('\n')
+        assert pt == \
+            datadir.read('example-setup-message-cleartext-pyac.key').rstrip('\n')
 
 
     def test_sym_encrypt_decrypt(self, pgpycrypto, datadir):
-        plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
-        encmsg = pgpycrypto.sym_encrypt(plaintext, PASSPHRASE)
-        plainmsg = pgpycrypto.sym_decrypt(str(encmsg), PASSPHRASE)
+        pt = datadir.read('example-setup-message-cleartext-pyac.key')
+        cmsg = pgpycrypto.sym_encrypt(pt, PASSPHRASE)
+        pmsg = pgpycrypto.sym_decrypt(str(cmsg), PASSPHRASE)
 
-        assert plainmsg.message == plaintext
+        assert pmsg.message == pt

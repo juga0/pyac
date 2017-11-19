@@ -350,37 +350,37 @@ class PGPyCrypto(object):
         return x
 
     def _encrypt_msg_with_pkey(self, data, key):
-        clear_msg = PGPMessage.new(data)
+        msg = PGPMessage.new(data)
         pkey = key if key.is_public else key.pubkey
-        enc_msg = pkey.encrypt(clear_msg)
-        return enc_msg
+        cmsg = pkey.encrypt(msg)
+        return cmsg
 
     def encrypt(self, data, recipients):
         assert len(recipients) >= 1
         if not isinstance(data, PGPMessage):
-            clear_msg = PGPMessage.new(data)
+            msg = PGPMessage.new(data)
         else:
-            clear_msg = data
-        # enc_msg |= self.pgpykey.sign(enc_msg)
+            msg = data
+        # cmsg |= self.pgpykey.sign(cmsg)
         if len(recipients) == 1:
             key = self._get_key_from_addr(recipients[0])
             pkey = key if key.is_public else key.pubkey
-            enc_msg = pkey.encrypt(clear_msg)
+            cmsg = pkey.encrypt(msg)
         else:
             # The symmetric cipher should be specified, in case the first
             # preferred cipher is not the same for all recipients public
             # keys.
             cipher = SymmetricKeyAlgorithm.AES256
             sessionkey = cipher.gen_key()
-            enc_msg = clear_msg
+            cmsg = msg
             for r in recipients:
                 key = self._get_key_from_addr(r)
                 pkey = key if key.is_public else key.pubkey
-                enc_msg = pkey.encrypt(enc_msg, cipher=cipher,
+                cmsg = pkey.encrypt(cmsg, cipher=cipher,
                                        sessionkey=sessionkey)
             del sessionkey
-        assert enc_msg.is_encrypted
-        return str(enc_msg)
+        assert cmsg.is_encrypted
+        return str(cmsg)
 
     def sign(self, data, keyhandle):
         key = self._get_key_from_keyhandle(keyhandle)
@@ -393,8 +393,8 @@ class PGPyCrypto(object):
         sig = self.sign(pgpymsg, keyhandle)
         pgpymsg |= sig
         assert pgpymsg.is_signed
-        enc = self.encrypt(pgpymsg, recipients)
-        return enc
+        cmsg = self.encrypt(pgpymsg, recipients)
+        return cmsg
 
     def _skeys(self):
         skeys = []
@@ -416,14 +416,14 @@ class PGPyCrypto(object):
 
     def decrypt(self, enc_data, skey=None):
         if isinstance(enc_data, str):
-            enc_msg = PGPMessage.from_blob(enc_data)
+            cmsg = PGPMessage.from_blob(enc_data)
         else:
-            enc_msg = enc_data
-        assert enc_msg.is_encrypted
+            cmsg = enc_data
+        assert cmsg.is_encrypted
         if skey is None:
-            keyhandle = enc_msg.encrypters.pop()
+            keyhandle = cmsg.encrypters.pop()
             skey = self._get_key_from_keyhandle(keyhandle)
-        out = skey.decrypt(enc_msg)
+        out = skey.decrypt(cmsg)
         keyinfos = []
         keyinfos.append(KeyInfo(skey.key_algorithm.name, skey.key_size,
                                 skey.fingerprint.keyid, skey.userids[0].name,
@@ -438,11 +438,11 @@ class PGPyCrypto(object):
     def sym_encrypt(self, text, passphrase):
         if isinstance(text, str):
             text = PGPMessage.new(text)
-        encmsg = text.encrypt(passphrase, cipher=SymmetricKeyAlgorithm.AES128)
-        return encmsg
+        cmsg = text.encrypt(passphrase, cipher=SymmetricKeyAlgorithm.AES128)
+        return cmsg
 
     def sym_decrypt(self, text, passphrase):
         if isinstance(text, str):
             text = PGPMessage.from_blob(text)
-        plainmsg = text.decrypt(passphrase)
-        return plainmsg
+        pmsg = text.decrypt(passphrase)
+        return pmsg
