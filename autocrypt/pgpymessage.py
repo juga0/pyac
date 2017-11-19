@@ -40,10 +40,10 @@ __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'gen_ac_headervaluestr', 'parse_header_value', 'parse_ac_headers',
            'gen_encrypted_email', 'add_headers', 'add_ac_headers',
            'gen_ac_email', 'decrypt_email', 'parse_ac_email',
-           'header_unwrap_keydata', 'gen_ac_gossip_headervalue',
-           'gen_ac_gossip_headervalues', 'parse_ac_gossip_headers',
-           'store_gossip_keys', 'get_skey_from_msg', 'parse_ac_gossip_email',
-           'gen_ac_gossip_cleartext_email', 'gen_ac_gossip_email',
+           'header_unwrap_keydata', 'gen_gossip_headervalue',
+           'gen_gossip_headervalues', 'parse_gossip_list_from_msg',
+           'store_keys_from_gossiplist', 'get_seckey_from_msg', 'parse_gossip_email',
+           'gen_gossip_cleartext_email', 'gen_gossip_email',
            'gen_ac_setup_seckey', 'gen_ac_setup_passphrase',
            'gen_ac_setup_enc_seckey', 'gen_ac_setup_email', 'parse_email']
 
@@ -237,14 +237,14 @@ def header_unwrap_keydata(text):
     # NOTE: this would only replace the first instance found
     msg = text if isinstance(text, Message) else parser.parsestr(text)
     msg.replace_header(AC, header_unwrap(msg.get(AC)))
-    ac_gossip_headers = msg.get_all(AC_GOSSIP)
-    if ac_gossip_headers is not None:
-        for g in ac_gossip_headers:
+    gossip_headers = msg.get_all(AC_GOSSIP)
+    if gossip_headers is not None:
+        for g in gossip_headers:
             msg[AC_GOSSIP] = header_unwrap(g)
     return msg.as_string()
 
 
-def gen_ac_gossip_headervalue(addr, keydata):
+def gen_gossip_headervalue(addr, keydata):
     """Generate Autocrypt Gossip header string."""
     return AC_GOSSIP_HEADER % {ADDR: addr, KEYDATA: keydata}
 
@@ -305,14 +305,14 @@ def parse_ac_email(msg, p):
         logger.error('There is more than one Autocrypt header.')
     p.import_keydata(b64decode(ac_headervaluedict['keydata']))
     logger.debug('Imported keydata from Autcrypt header.')
-    key = get_skey_from_msg(msg, p)
+    key = get_seckey_from_msg(msg, p)
 
     pt = decrypt_email(msg, p, key)
     logger.info('Parsed Autocrypt Email.')
     return msg, pt
 
 
-def gen_ac_gossip_headervalues(recipients, p):
+def gen_gossip_headervalues(recipients, p):
     """Generate Autcrypt Gossip header values.
 
     :return: Autcrypt Gossip header values in the form:
@@ -324,12 +324,12 @@ def gen_ac_gossip_headervalues(recipients, p):
         logger.debug('Generating Gossip header for recipient:\n%s', r)
         keyhandle = p._get_keyhandle_from_addr(r)
         keydata = p.get_public_keydata(keyhandle, b64=True)
-        g = gen_ac_gossip_headervalue(r, keydata)
+        g = gen_gossip_headervalue(r, keydata)
         gossip_list.append(g)
     return gossip_list
 
 
-def parse_ac_gossip_headers(msg):
+def parse_gossip_list_from_msg(msg):
     """Parse Autcrypt Gossip header values from Email.
 
     :return: Autcrypt Gossip header values in the form:
@@ -341,7 +341,7 @@ def parse_ac_gossip_headers(msg):
     return gossip_list
 
 
-def store_gossip_keys(gossip_list, p):
+def store_keys_from_gossiplist(gossip_list, p):
     for g in gossip_list:
         g_dict = parse_header_value(g)
         k = g_dict['keydata']
@@ -349,7 +349,7 @@ def store_gossip_keys(gossip_list, p):
         p.import_keydata(b64decode(k))
 
 
-def get_skey_from_msg(msg, p):
+def get_seckey_from_msg(msg, p):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     for recipient in msg['To'].split(', '):
         key = p._get_key_from_addr(recipient)
@@ -365,7 +365,7 @@ def get_skey_from_msg(msg, p):
     return None
 
 
-def parse_ac_gossip_email(msg, p):
+def parse_gossip_email(msg, p):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
@@ -376,22 +376,22 @@ def parse_ac_gossip_email(msg, p):
     p.import_keydata(b64decode(ac_headervaluedict['keydata']))
     logger.debug('Imported keydata from Autocrypt header.')
 
-    key = get_skey_from_msg(msg, p)
+    key = get_seckey_from_msg(msg, p)
     dec_text = decrypt_email(msg, p, key)
     # NOTE: hacky workaround, because "\n" is added after "; ""
     dec_text = dec_text.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
     open('foo', 'w').write(dec_text)
     dec_msg = parser.parsestr(dec_text)
     logger.debug('dec_msg %s', dec_msg)
-    gossip_list = parse_ac_gossip_headers(dec_msg)
+    gossip_list = parse_gossip_list_from_msg(dec_msg)
     logger.debug('gossip_list %s', gossip_list)
-    store_gossip_keys(gossip_list, p)
+    store_keys_from_gossiplist(gossip_list, p)
 
     return msg, dec_msg, gossip_list
 
 
-def gen_ac_gossip_cleartext_email(recipients, body, p):
-    gossip_headers = gen_ac_gossip_headervalues(recipients, p)
+def gen_gossip_cleartext_email(recipients, body, p):
+    gossip_headers = gen_gossip_headervalues(recipients, p)
     logger.debug('gossip headers %s', gossip_headers)
     msg = MIMEText(body)
     for g in gossip_headers:
@@ -399,7 +399,7 @@ def gen_ac_gossip_cleartext_email(recipients, body, p):
     return msg
 
 
-def gen_ac_gossip_email(sender, recipients, p, subject, body, pe=None,
+def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
                         keyhandle=None, date=None, _dto=False, message_id=None,
                         boundary=None, _extra=None):
     """."""
@@ -407,7 +407,7 @@ def gen_ac_gossip_email(sender, recipients, p, subject, body, pe=None,
         keyhandle = p._get_keyhandle_from_addr(sender)
     keydata = p.get_public_keydata(keyhandle, b64=True)
 
-    msg_clear = gen_ac_gossip_cleartext_email(recipients, body, p)
+    msg_clear = gen_gossip_cleartext_email(recipients, body, p)
 
     enc = p.sign_encrypt(msg_clear.as_bytes(), keyhandle, recipients)
     msg = gen_encrypted_email(str(enc), boundary=boundary)
@@ -531,7 +531,7 @@ def parse_email(msg, p, passphrase=None):
         logger.info('Email contains Autocrypt headers.')
         msg, pt = parse_ac_email(msg, p)
         if parser.parsestr(pt).get(AC_GOSSIP) is not None:
-            return parse_ac_gossip_email(msg, p)
+            return parse_gossip_email(msg, p)
     elif msg.get(AC_GOSSIP) is not None:
         logger.info('Email contains Autocrypt Gossip headers.')
-        return parse_ac_gossip_email(msg, p)
+        return parse_gossip_email(msg, p)

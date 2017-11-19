@@ -33,13 +33,13 @@ from autocrypt.pgpymessage import (wrap, unwrap,
                                    gen_ac_email, decrypt_email,
                                    parse_ac_email,
                                    header_unwrap_keydata,
-                                   gen_ac_gossip_headervalue,
-                                   gen_ac_gossip_headervalues,
-                                   parse_ac_gossip_headers,
-                                   store_gossip_keys, get_skey_from_msg,
-                                   parse_ac_gossip_email,
-                                   gen_ac_gossip_cleartext_email,
-                                   gen_ac_gossip_email,
+                                   gen_gossip_headervalue,
+                                   gen_gossip_headervalues,
+                                   parse_gossip_list_from_msg,
+                                   store_keys_from_gossiplist, get_seckey_from_msg,
+                                   parse_gossip_email,
+                                   gen_gossip_cleartext_email,
+                                   gen_gossip_email,
                                    gen_ac_setup_seckey,
                                    gen_ac_setup_passphrase,
                                    gen_ac_setup_enc_seckey,
@@ -87,26 +87,26 @@ def test_parse_ac_email(pgpycrypto, datadir):
     assert parser.parsestr(pt).get_payload() == BODY_AC
 
 
-def test_gen_ac_gossip_headervalue():
-    h = gen_ac_gossip_headervalue(BOB, BOB_KEYDATA)
+def test_gen_gossip_headervalue():
+    h = gen_gossip_headervalue(BOB, BOB_KEYDATA)
     assert h == header_unwrap(BOB_GOSSIP)
 
 
-def test_parse_ac_gossip_header(pgpycrypto, datadir):
+def test_parse_gossip_list_from_msg(pgpycrypto, datadir):
     text = datadir.read('example-gossip-cleartext_pyac.eml')
-    gossip_list = parse_ac_gossip_headers(text)
-    headers = gen_ac_gossip_headervalues(RECIPIENTS, pgpycrypto)
+    gossip_list = parse_gossip_list_from_msg(text)
+    headers = gen_gossip_headervalues(RECIPIENTS, pgpycrypto)
     assert headers == gossip_list
 
 
-def test_gen_ac_gossip_cleartext_email(pgpycrypto, datadir):
+def test_gen_gossip_cleartext_email(pgpycrypto, datadir):
     text = datadir.read('example-gossip-cleartext_pyac.eml')
-    msg = gen_ac_gossip_cleartext_email(RECIPIENTS, BODY_GOSSIP, pgpycrypto)
+    msg = gen_gossip_cleartext_email(RECIPIENTS, BODY_GOSSIP, pgpycrypto)
     assert msg.as_string() == CLEARTEXT_GOSSIP
 
 
-def test_gen_ac_gossip_email(pgpycrypto, datadir):
-    msg = gen_ac_gossip_email(ALICE, RECIPIENTS, pgpycrypto,
+def test_gen_gossip_email(pgpycrypto, datadir):
+    msg = gen_gossip_email(ALICE, RECIPIENTS, pgpycrypto,
                               SUBJECT_GOSSIP, BODY_GOSSIP, MUTUAL,
                               '71DBC5657FDE65A7',
                               'Tue, 07 Nov 2017 14:56:25 +0100',
@@ -119,15 +119,15 @@ def test_gen_ac_gossip_email(pgpycrypto, datadir):
         datadir.read('example-gossip_pyac.eml').split()[:25]
 
 
-def test_parse_ac_gossip_email(pgpycrypto, datadir):
+def test_parse_gossip_email(pgpycrypto, datadir):
     text = datadir.read('example-gossip_pyac.eml')
-    msg, dec_msg, gossip = parse_ac_gossip_email(text, pgpycrypto)
+    msg, dec_msg, gossip = parse_gossip_email(text, pgpycrypto)
     assert dec_msg.as_string() == \
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
 
-def test_gen_parse_ac_gossip_email(pgpycrypto, datadir):
-    msg = gen_ac_gossip_email(ALICE, RECIPIENTS, pgpycrypto,
+def test_gen_parse_gossip_email(pgpycrypto, datadir):
+    msg = gen_gossip_email(ALICE, RECIPIENTS, pgpycrypto,
                               SUBJECT_GOSSIP, BODY_GOSSIP, MUTUAL,
                               '71DBC5657FDE65A7',
                               'Tue, 07 Nov 2017 14:56:25 +0100',
@@ -135,7 +135,7 @@ def test_gen_parse_ac_gossip_email(pgpycrypto, datadir):
                               '<gossip-example@autocrypt.example>',
                               'PLdq3hBodDceBdiavo4rbQeh0u8JfdUHL')
 
-    msg, dec_msg, gossip = parse_ac_gossip_email(msg.as_string(),
+    msg, dec_msg, gossip = parse_gossip_email(msg.as_string(),
                                                  pgpycrypto)
     assert dec_msg.as_string() + '\n' == \
         datadir.read('example-gossip-cleartext_pyac.eml')
