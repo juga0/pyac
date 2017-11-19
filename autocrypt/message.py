@@ -371,7 +371,6 @@ def parse_gossip_ct(msg, p, key=None):
     # NOTE: hacky workaround, because "\n" is added after "; ""
     pt = pt.replace(
         ";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
-    open('foo', 'w').write(pt)
     pmsg = parser.parsestr(pt)
     gossip_list = parse_gossip_list_from_msg(pmsg)
     logger.debug('gossip_list %s', gossip_list)
