@@ -28,7 +28,7 @@ from .conflog import LOGGING
 from .constants import KEY_SIZE
 
 logging.config.dictConfig(LOGGING)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('autocrypt')
 
 
 # TODO: see which defaults we would like here
@@ -98,6 +98,7 @@ class PGPyCrypto(object):
         """
         # NOTE: called as .._pgpy.. to know that is instance of PGPKey
         self.pgpydir = homedir
+        logger.debug('PGPyCrypto pgpydir %s', self.pgpydir)
         self.memkr = PGPKeyring()
         self._ensure_init()
 
@@ -109,7 +110,7 @@ class PGPyCrypto(object):
         if self.pgpydir is None:
             return
         if not os.path.exists(self.pgpydir):
-            os.mkdir(self.pgpydir)
+            os.makedirs(self.pgpydir)
             os.chmod(self.pgpydir, 0o700)
         self._loadkr()
 
