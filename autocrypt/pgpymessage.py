@@ -44,8 +44,8 @@ __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'gen_gossip_headervalues', 'parse_gossip_list_from_msg',
            'store_keys_from_gossiplist', 'get_seckey_from_msg', 'parse_gossip_email',
            'gen_gossip_pt_email', 'gen_gossip_email',
-           'gen_ac_setup_seckey', 'gen_ac_setup_passphrase',
-           'gen_ac_setup_enc_seckey', 'gen_ac_setup_email', 'parse_email']
+           'gen_ac_setup_ct', 'gen_ac_setup_passphrase',
+           'gen_ac_setup_payload', 'gen_ac_setup_email', 'parse_email']
 
 
 def wrap(text, maxlen=76, wrapstr=" "):
@@ -417,14 +417,14 @@ def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
     return cmsg
 
 
-def gen_ac_setup_seckey(sender, pe, p, keyhandle=None):
+def gen_ac_setup_ct(sender, pe, p, keyhandle=None):
     if keyhandle is None:
         keyhandle = p._get_keyhandle_from_addr(sender)
     seckey = p.get_secret_keydata(keyhandle, armor=True)
     seckey_list = seckey.split('\n')
     seckey_list.insert(2, AC_PREFER_ENCRYPT_HEADER + pe)
-    ac_setup_seckey = "\n".join(seckey_list)
-    return ac_setup_seckey
+    ac_setup_ct = "\n".join(seckey_list)
+    return ac_setup_ct
 
 
 def gen_ac_setup_passphrase():
@@ -440,8 +440,8 @@ def gen_ac_setup_passphrase():
     return passphrase_blocks
 
 
-def gen_ac_setup_enc_seckey(ac_setup_seckey, passphrase, p):
-    ct = p.sym_encrypt(ac_setup_seckey, passphrase)
+def gen_ac_setup_payload(ac_setup_ct, passphrase, p):
+    ct = p.sym_encrypt(ac_setup_ct, passphrase)
     ctlist = str(ct).split('\n')
     ctlist.insert(2, AC_PASSPHRASE_FORMAT + "\n" +
                        AC_PASSPHRASE_BEGIN +
@@ -454,10 +454,10 @@ def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
                        keyhandle=None, date=None, _dto=False, message_id=None,
                        boundary=None, _extra=None, passphrase=None):
     passphrase = passphrase or gen_ac_setup_passphrase()
-    ac_setup_seckey = gen_ac_setup_seckey(sender, pe, p, keyhandle)
-    ac_setup_enc_seckey = gen_ac_setup_enc_seckey(ac_setup_seckey,
+    ac_setup_ct = gen_ac_setup_ct(sender, pe, p, keyhandle)
+    ac_setup_payload = gen_ac_setup_payload(ac_setup_ct,
                                                   passphrase, p)
-    msg = MIMEMultipartACSetup(ac_setup_enc_seckey, boundary=boundary)
+    msg = MIMEMultipartACSetup(ac_setup_payload, boundary=boundary)
     if _extra is None:
         _extra = {}
     _extra.update({AC_SETUP_MSG: LEVEL_NUMBER})
@@ -472,7 +472,7 @@ def parse_ac_setup_header(msg):
     return msg.get(AC_SETUP_MSG)
 
 
-def parse_ac_setup_enc_part(ct, passphrase, p):
+def parse_ac_setup_ct(ct, passphrase, p):
     ctlist = ct.split('\n')
     pass_format = ctlist.pop(2)
     if pass_format != AC_PASSPHRASE_FORMAT:
@@ -513,7 +513,7 @@ def parse_ac_setup_email(msg, p, passphrase):
     logger.info(description.as_string())
 
     ct = parse_ac_setup_payload(payload)
-    pmsg = parse_ac_setup_enc_part(ct, passphrase, p)
+    pmsg = parse_ac_setup_ct(ct, passphrase, p)
     p.import_keydata(pmsg.message)
     logger.info('Secret key imported.')
     return pmsg

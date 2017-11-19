@@ -40,11 +40,11 @@ from autocrypt.pgpymessage import (wrap, unwrap,
                                    parse_gossip_email,
                                    gen_gossip_pt_email,
                                    gen_gossip_email,
-                                   gen_ac_setup_seckey,
+                                   gen_ac_setup_ct,
                                    gen_ac_setup_passphrase,
-                                   gen_ac_setup_enc_seckey,
+                                   gen_ac_setup_payload,
                                    gen_ac_setup_email, parse_ac_setup_payload,
-                                   parse_ac_setup_enc_part,
+                                   parse_ac_setup_ct,
                                    parse_ac_setup_email, parse_email)
 
 logging.config.dictConfig(LOGGING)
@@ -141,10 +141,10 @@ def test_gen_parse_gossip_email(pgpycrypto, datadir):
         datadir.read('example-gossip-cleartext_pyac.eml')
 
 
-def test_gen_ac_setup_seckey(pgpycrypto, datadir):
-    ac_setup_seckey = gen_ac_setup_seckey(ALICE, MUTUAL, pgpycrypto,
+def test_gen_ac_setup_ct(pgpycrypto, datadir):
+    ac_setup_ct = gen_ac_setup_ct(ALICE, MUTUAL, pgpycrypto,
                                           '71DBC5657FDE65A7')
-    assert ac_setup_seckey.split('\n')[:4] == \
+    assert ac_setup_ct.split('\n')[:4] == \
         datadir.read('example-setup-message-cleartext-pyac.key').split('\n')[:4]
 
 
@@ -157,11 +157,11 @@ def test_gen_ac_passphrase():
     exp = r'^((\d{4}-){3}\\n){2}(\d{4}-){2}\d{4}$'
 
 
-def test_gen_ac_setup_enc_seckey(pgpycrypto, datadir):
-    ac_setup_seckey = datadir.read('example-setup-message-cleartext-pyac.key')
-    ac_setup_enc_seckey = gen_ac_setup_enc_seckey(ac_setup_seckey, PASSPHRASE,
+def test_gen_ac_setup_payload(pgpycrypto, datadir):
+    ac_setup_ct = datadir.read('example-setup-message-cleartext-pyac.key')
+    ac_setup_payload = gen_ac_setup_payload(ac_setup_ct, PASSPHRASE,
                                                   pgpycrypto)
-    assert ac_setup_enc_seckey.split('\n')[:10] == \
+    assert ac_setup_payload.split('\n')[:10] == \
         AC_SETUP_PAYLOAD.split('\n')[:10]
 
 
@@ -182,8 +182,8 @@ def test_parse_ac_setup_payload(pgpycrypto):
     assert AC_SETUP_ENC == ct + '\n'
 
 
-def test_parse_ac_setup_enc_part(pgpycrypto, datadir):
-    pmsg = parse_ac_setup_enc_part(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
+def test_parse_ac_setup_ct(pgpycrypto, datadir):
+    pmsg = parse_ac_setup_ct(AC_SETUP_ENC, PASSPHRASE, pgpycrypto)
     # NOTE: this is needed because the blob was not originally encrypted
     # with PGPy. It'll fail with other PGPy versions
     pt = pmsg.message
