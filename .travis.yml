@@ -2,7 +2,7 @@ sudo: required
 language: python
 dist: trusty
 python:
-    - '3.5'
+    - '3.6'
 
 install:
   - pip install -U tox
@@ -10,7 +10,7 @@ install:
 env:
   matrix:
     - TESTENV=doc
-    - TESTENV=py35
+    - TESTENV=py36
     - TESTENV=lint
 
 script:

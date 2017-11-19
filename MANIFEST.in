@@ -2,8 +2,12 @@ include *.txt
 include LICENSE
 include *.rst
 include tox.ini
-prune experiments
-recursive-include tests *.eml
+recursive-include tests example-*.eml
 recursive-include tests *.py
 recursive-include tests *.secretkey
+recursive-include tests *.sec.asc
 include tests/data/*.key
+recursive-include docs *.bat
+recursive-include docs *.py
+recursive-include docs *.rst
+recursive-include docs Makefile

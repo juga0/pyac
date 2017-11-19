@@ -1,3 +1,9 @@
+0.4.1
+------
+
+- Change fixtures in tests
+- Fix tox
+
 0.4.0
 ------
 
