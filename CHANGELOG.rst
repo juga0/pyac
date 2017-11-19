@@ -1,3 +1,9 @@
+0.4.0
+------
+
+- Add main script
+- Cleanup/fixes...
+
 0.3.0
 ------
 
