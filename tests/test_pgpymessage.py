@@ -5,6 +5,8 @@
 
 from __future__ import unicode_literals
 import logging
+from email.parser import Parser
+from email import policy
 
 from autocrypt.conflog import LOGGING
 from autocrypt.examples_data import (ALICE, BOB, RECIPIENTS, ALICE_KEYDATA,
@@ -12,11 +14,14 @@ from autocrypt.examples_data import (ALICE, BOB, RECIPIENTS, ALICE_KEYDATA,
                                      SUBJECT_GOSSIP, BODY_GOSSIP,
                                      BOB_KEYDATA_WRAPPED, CLEARTEXT_GOSSIP,
                                      PASSPHRASE, AC_SETUP_PAYLOAD,
-                                     AC_SETUP_ENC)
+                                     AC_SETUP_ENC, PGPHOME, SUBJECT_AC,
+                                     BODY_AC)
 
 from autocrypt.constants import (MUTUAL, AC_PASSPHRASE_NUM_BLOCKS,
                                  AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_LEN,
                                  AC_SETUP_SUBJECT)
+
+# from autocrypt.pgpycrypto import PGPyCrypto
 
 from autocrypt.pgpymessage import (keydata_wrap, keydata_unwrap,
                                    gen_header_from_dict, header_unwrap,
@@ -40,11 +45,13 @@ from autocrypt.pgpymessage import (keydata_wrap, keydata_unwrap,
                                    gen_ac_setup_enc_seckey,
                                    gen_ac_setup_email, parse_ac_setup_payload,
                                    parse_ac_setup_enc_part,
-                                   parse_ac_setup_email)
+                                   parse_ac_setup_email, parse_email)
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
 logger.setLevel(logging.DEBUG)
+parser = Parser(policy=policy.default)
+# pgpycrypto = PGPyCrypto(PGPHOME)
 
 
 def test_keydata_wrap():
@@ -59,6 +66,25 @@ def test_ac_header_wrap():
 def test_gen_ac_header():
     h = gen_ac_header(ALICE, ALICE_KEYDATA, MUTUAL)
     assert h == header_unwrap(ALICE_AC)
+
+
+def test_gen_ac_email(pgpycrypto, datadir):
+    msg = gen_ac_email(ALICE, [BOB], pgpycrypto, SUBJECT_AC, BODY_AC, MUTUAL,
+                       date='Tue, 07 Nov 2017 14:53:50 +0100',
+                       _dto='<bob@autocrypt.example>',
+                       message_id='<rsa-3072@autocrypt.example>',
+                       boundary='Y6fyGi9SoGeH8WwRaEdC6bbBcYOedDzrQ')
+    text = datadir.read('example-simple-autocrypt-pyac.eml')
+    assert msg.as_string().split('\n')[:23] == \
+        text.split('\n')[:23]
+
+
+def test_parse_ac_email(pgpycrypto, datadir):
+    text = datadir.read('example-simple-autocrypt-pyac.eml')
+    msg, dec = parse_ac_email(text, pgpycrypto)
+    # NOTE: the following is needed cause decrypt returns plaintext to have
+    # same API as bingpg
+    assert parser.parsestr(dec).get_payload() == BODY_AC
 
 
 def test_gen_ac_gossip_header():
@@ -181,3 +207,28 @@ def test_parse_ac_setup_email(pgpycrypto, datadir):
     pt = "\n".join(ptlist)
     plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
     assert pt == plaintext.rstrip('\n')
+
+
+def test_parse_email(pgpycrypto, datadir):
+    enctext = datadir.read('example-setup-message-pyac.eml')
+    plainmsg = parse_email(enctext, pgpycrypto, PASSPHRASE)
+    # NOTE: this is needed because the blob was not originally encrypted
+    # with PGPy. It'll fail with other PGPy versions
+    pt = plainmsg.message
+    pt = pt.replace('\r\n', '\n').rstrip('\n')
+    ptlist = pt.split('\n')
+    ptlist.insert(1, 'Version: PGPy v0.4.3')
+    pt = "\n".join(ptlist)
+    plaintext = datadir.read('example-setup-message-cleartext-pyac.key')
+    assert pt == plaintext.rstrip('\n')
+
+    text = datadir.read('example-gossip_pyac.eml')
+    msg, dec_msg, gossip = parse_email(text, pgpycrypto)
+    assert dec_msg.as_string() == \
+        datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
+
+    text = datadir.read('example-simple-autocrypt-pyac.eml')
+    msg, dec = parse_ac_email(text, pgpycrypto)
+    # NOTE: the following is needed cause decrypt returns plaintext to have
+    # same API as bingpg
+    assert parser.parsestr(dec).get_payload() == BODY_AC

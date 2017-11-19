@@ -10,6 +10,7 @@ import logging
 import logging.config
 import random
 import re
+import sys
 
 from base64 import b64decode
 from email import policy
@@ -183,7 +184,7 @@ def gen_ac_email(sender, recipients, p, subject, body, pe=None,
     enc = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
     msg = gen_mime_enc_multipart(str(enc), boundary)
     gen_headers(msg, sender, recipients, subject, date, _dto,
-                      message_id, _extra)
+                message_id, _extra)
     gen_ac_headers(msg, sender, keydata, pe)
     logger.debug('Generated Autcrypt Email: \n%s', msg)
     return msg
@@ -442,3 +443,21 @@ def parse_ac_setup_email(msg, p, passphrase):
     p.import_keydata(plainmsg.message)
     logger.info('Secret key imported.')
     return plainmsg
+
+
+def parse_email(msg, p, passphrase=None):
+    if isinstance(msg, str):
+        msg = parser.parsestr(msg)
+    if msg.get(AC_SETUP_MSG) == LEVEL_NUMBER:
+        logger.info('Email is an Autocrypt Setup Message.')
+        if passphrase is None:
+            passphrase = sys.raw_input('Introduce the passphrase:\n')
+        return parse_ac_setup_email(msg, p, passphrase)
+    elif msg.get(AC) is not None:
+        logger.info('Email contains Autocrypt headers.')
+        msg, dec = parse_ac_email(msg, p)
+        if parser.parsestr(dec).get(AC_GOSSIP) is not None:
+            return parse_ac_gossip_email(msg, p)
+    elif msg.get(AC_GOSSIP) is not None:
+        logger.info('Email contains Autocrypt Gossip headers.')
+        return parse_ac_gossip_email(msg, p)
