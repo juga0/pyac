@@ -121,8 +121,8 @@ def test_gen_gossip_email(pgpycrypto, datadir):
 
 def test_parse_gossip_email(pgpycrypto, datadir):
     text = datadir.read('example-gossip_pyac.eml')
-    msg, dec_msg, gossip = parse_gossip_email(text, pgpycrypto)
-    assert dec_msg.as_string() == \
+    msg, pmsg, gossip = parse_gossip_email(text, pgpycrypto)
+    assert pmsg.as_string() == \
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
 
@@ -135,9 +135,9 @@ def test_gen_parse_gossip_email(pgpycrypto, datadir):
                               '<gossip-example@autocrypt.example>',
                               'PLdq3hBodDceBdiavo4rbQeh0u8JfdUHL')
 
-    msg, dec_msg, gossip = parse_gossip_email(msg.as_string(),
+    msg, pmsg, gossip = parse_gossip_email(msg.as_string(),
                                                  pgpycrypto)
-    assert dec_msg.as_string() + '\n' == \
+    assert pmsg.as_string() + '\n' == \
         datadir.read('example-gossip-cleartext_pyac.eml')
 
 
@@ -223,8 +223,8 @@ def test_parse_email(pgpycrypto, datadir):
     assert pt == plaintext.rstrip('\n')
 
     text = datadir.read('example-gossip_pyac.eml')
-    msg, dec_msg, gossip = parse_email(text, pgpycrypto)
-    assert dec_msg.as_string() == \
+    msg, pmsg, gossip = parse_email(text, pgpycrypto)
+    assert pmsg.as_string() == \
         datadir.read('example-gossip-cleartext_pyac.eml').rstrip()
 
     text = datadir.read('example-simple-autocrypt-pyac.eml')

@@ -381,13 +381,13 @@ def parse_gossip_email(msg, p):
     # NOTE: hacky workaround, because "\n" is added after "; ""
     pt = pt.replace(";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
     open('foo', 'w').write(pt)
-    dec_msg = parser.parsestr(pt)
-    logger.debug('dec_msg %s', dec_msg)
-    gossip_list = parse_gossip_list_from_msg(dec_msg)
+    pmsg = parser.parsestr(pt)
+    logger.debug('pmsg %s', pmsg)
+    gossip_list = parse_gossip_list_from_msg(pmsg)
     logger.debug('gossip_list %s', gossip_list)
     store_keys_from_gossiplist(gossip_list, p)
 
-    return msg, dec_msg, gossip_list
+    return msg, pmsg, gossip_list
 
 
 def gen_gossip_cleartext_email(recipients, body, p):
