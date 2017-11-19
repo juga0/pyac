@@ -25,7 +25,7 @@ and store it securely.
 --Y6fyGi9SoGeH8WwRaEdC6bbBcYOedDzrQ
 Content-Type: application/autocrypt-setup
 MIME-Version: 1.0
-Content-Disposition: attachment; filename="autocrypt-setup-message.txt"
+Content-Disposition: attachment; filename="autocrypt-setup-message.html"
 
 This is the Autocrypt setup file used to transfer settings and
 keys between clients. You can decrypt it using the Setup Code

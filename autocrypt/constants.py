@@ -60,7 +60,8 @@ LEVEL_NUMBER = 'v1'
 AC_SETUP_MSG_HEADER = AC_SETUP_MSG + LEVEL_NUMBER
 AC_CT_SETUP = 'autocrypt-setup'
 # AC_CT_SETUP = 'autocrypt-setup; filename="autocrypt-setup-message.txt"
-AC_CT_SETUP_FN = "autocrypt-setup-message.txt"
+# NOTE: attachment will add HTML text with email library, so using .html ext.
+AC_CT_SETUP_FN = "autocrypt-setup-message.html"
 
 AC_SETUP_TEXT = """This message contains all information to transfer your Autocrypt
 settings along with your secret key securely from your original
