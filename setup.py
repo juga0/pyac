@@ -33,7 +33,7 @@ def main():
         packages=['autocrypt'],
         entry_points='''
             [console_scripts]
-            examplel1=autocrypt.examplel1:main
+            autocrypt=autocrypt.autocrypt:main
         ''',
         install_requires=["click>=6.0", "six", "PGPy>=0.4.1", "emailpgp"],
         extras_require={
