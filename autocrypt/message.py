@@ -27,7 +27,9 @@ from .constants import (ADDR, KEYDATA, AC_HEADER, AC_GOSSIP,
                         AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_FORMAT,
                         AC_PASSPHRASE_BEGIN_LEN, AC_PASSPHRASE_NUM_BLOCKS,
                         AC_PASSPHRASE_BEGIN, AC_SETUP_INTRO, AC_SETUP_SUBJECT,
-                        AC_SETUP_MSG, LEVEL_NUMBER)
+                        AC_SETUP_MSG, LEVEL_NUMBER, ACCOUNTS, PEERS, SECKEY,
+                        PUBKEY)
+from .crypto import get_keydata
 
 logger = logging.getLogger(__name__)
 parser = Parser(policy=policy.default)
@@ -251,20 +253,21 @@ def gen_gossip_headervalue(addr, keydata):
 
 # NOTE: from here functions that needs crypo
 ##############################################
-def gen_ac_email(sender, recipients, p, subject, body, pe=None,
-                 keyhandle=None, date=None, _dto=False, message_id=None,
+def gen_ac_email(p, sender, recipients, subject, body, pe=None,
+                 date=None, _dto=False, message_id=None,
                  boundary=None, _extra=None):
     """Generate an Autocrypt Email.
 
     :return: an Autocrypt encrypted Email
     :rtype: Message
     """
-    if keyhandle is None:
-        keyhandle = p._get_keyhandle_from_addr(sender)
-    keydata = p.get_public_keydata(keyhandle, b64=True)
+    assert sender in p[ACCOUNTS].keys()
+    for r in recipients:
+        assert r in p[PEERS].keys()
+    keydata = get_keydata(p, sender)
 
     data = MIMEText(body)
-    cmsg = p.sign_encrypt(data.as_bytes(), keyhandle, recipients)
+    cmsg = p.sign_encrypt(data.as_bytes(), sender, recipients)
     msg = gen_encrypted_email(str(cmsg), boundary)
     add_headers(msg, sender, recipients, subject, date, _dto,
                 message_id, _extra)
@@ -285,7 +288,7 @@ def decrypt_email(msg, p, key=None):
     for payload in msg.get_payload():
         if payload.get_content_type() == 'application/octet-stream':
             ct = payload.get_payload()
-    pt, _ = p.decrypt(ct, key)
+    pt = p.decrypt(ct, key)
     logger.info('Decrypted Email.')
     return pt.decode()
 

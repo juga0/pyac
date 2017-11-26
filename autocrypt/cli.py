@@ -13,10 +13,11 @@ import os.path
 
 from .conflog import LOGGING
 from .constants import BASE_DIR, MUTUAL
-from .examples_data import PGPHOME
-from .pgpycrypto import PGPyCrypto
-from .pgpymessage import (gen_ac_email, gen_gossip_email, gen_ac_setup_email,
-                          parse_email, gen_ac_setup_passphrase)
+from .tests_data import PGPHOME
+from .crypto import PGPyCrypto
+from .message import (gen_ac_email, gen_gossip_email, gen_ac_setup_email,
+                      parse_email, gen_ac_setup_passphrase)
+from .storage import load, new_account, new_peer, repr_profile
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -76,12 +77,19 @@ def main():
     parser.add_argument('-o', '--output',
                         help='Path to store the Autocrypt Email',
                         default='/tmp/output.eml')
+    parser.add_argument('--newaccount')
+    parser.add_argument('--newpeer')
+
     args = parser.parse_args()
     if args.debug:
         logger.setLevel(logging.DEBUG)
     logger.debug('args %s', args)
 
     p = PGPyCrypto(args.pgphome)
+
+    profile = load()
+    logger.info(repr_profile(profile))
+
 
     if args.genkey:
         p.gen_secret_key(emailadr=args.sender)
@@ -106,6 +114,11 @@ def main():
         gen_ac_setup_passphrase()
     if args.output and msg is not None:
         open(args.output, 'w').write(msg.as_string())
+
+    if args.newaccount:
+        new_account(profile, args.newaccount)
+    if args.newpeer:
+        new_peer(profile, args.newpeer)
 
 
 if __name__ == '__main__':

@@ -33,9 +33,10 @@ def main():
         packages=['autocrypt'],
         entry_points='''
             [console_scripts]
-            autocrypt=autocrypt.autocrypt:main
+            autocrypt=autocrypt.cli:main
         ''',
-        install_requires=["click>=6.0", "six", "PGPy>=0.4.1", "emailpgp"],
+        install_requires=["click>=6.0", "six", "PGPy>=0.4.1", "emailpgp",
+                          "attr"],
         extras_require={
             'dev': ['ipython', 'pyflakes', 'pep8'],
             'test': ['tox', 'pytest'],

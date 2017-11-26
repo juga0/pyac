@@ -7,14 +7,15 @@ The API is the same as in bingpg.py.
 
 from __future__ import print_function, unicode_literals
 
+from base64 import b64encode, b64decode
 import glob
 import os
 import logging
 import logging.config
 import re
 import sys
-
 import six
+
 from pgpy import PGPUID, PGPKey, PGPMessage, PGPKeyring, PGPSignature
 from pgpy.types import Armorable
 from pgpy.packet import Packet
@@ -23,9 +24,8 @@ from pgpy.constants import (CompressionAlgorithm, HashAlgorithm, KeyFlags,
 
 # TODO: these two functions should be in a separate file
 from .keyinfo import KeyInfo
-from .utils import b64encode_u
 from .conflog import LOGGING
-from .constants import KEY_SIZE
+from .constants import KEY_SIZE, ACCOUNTS, PEERS, SECKEY, PUBKEY
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -60,389 +60,202 @@ def key_bytes(pgpykey):
     :rtype: string
 
     """
-    assert isinstance(pgpykey, PGPKey)
-    if sys.version_info >= (3, 0):
-        keybytes = bytes(pgpykey)
+    assert isinstance(key, PGPKey)
+    return bytes(key) if sys.version_info >= (3, 0) \
+        else key.__bytes__()
+
+
+def _gen_skey_usage_all(addr):
+    seckey = PGPKey.new(SKEY_ALG, KEY_SIZE)
+    # NOTE: pgpy implements separate attributes for name and e-mail
+    # address. Name is mandatory.
+    # Here e-mail address is used for the attribute name,
+    # so that the uid is 'e-mail adress'.
+    # If name attribute would be set to empty string
+    # and email to the e-mail address, the uid would be
+    # ' <e-mail address>', which we do not want.
+    uid = PGPUID.new(addr)
+    seckey.add_uid(uid, usage=SKEY_USAGE_ALL, **SKEY_ARGS)
+    return seckey
+
+
+def _gen_ssubkey():
+    # NOTE: the uid for the subkeys can be obtained with .parent,
+    # but, unlike keys generated with gpg, it's not printed when imported
+    # in gpg keyring and run --fingerprint.
+    # in case of adding uid to the subkey, it raises currently some
+    # exceptions depending on which are the arguments used, which are not
+    # clear from the documentation.
+    ssubkey = PGPKey.new(SKEY_ALG, KEY_SIZE)
+    return ssubkey
+
+
+def _gen_skey_with_subkey(addr):
+    # NOTE: seckey should be generated with usage sign, but otherwise
+    # encryption does not work currently.
+    seckey = _gen_skey_usage_all(addr)
+    ssubkey = _gen_ssubkey()
+    seckey.add_subkey(ssubkey, usage=SKEY_USAGE_ENC)
+    return seckey
+
+
+def gen_key(addr):
+    return _gen_skey_with_subkey(addr)
+
+
+def _key2keydata(key):
+    assert isinstance(key, PGPKey)
+    keybytes = bytes(key)
+    kb64bytes = b64encode(keybytes)
+    kb64str = kb64bytes.decode('ascii')
+    return kb64str
+
+
+def _keydata2key(keydata):
+    assert isinstance(keydata, str)
+    kb64bytes = keydata.encode('ascii')
+    kbytes = b64decode(kb64bytes)
+    key = PGPKey.from_blob(kbytes)
+    return key
+
+
+def _key2keydatas(key):
+    assert key is not None
+    if key.is_private:
+        return (_key2keydata(key), _key2keydata(key.pubkey))
     else:
-        keybytes = pgpykey.__bytes__()
-    return keybytes
+        return(None, _key2keydata(key))
 
 
-class PGPyCrypto(object):
-    """OpenPGP operations for Autocrypt using PGPy.
+def _key_path(pgpydir, key):
+    ext = '.asc' if key.is_public else '.sec.asc'
+    keypath = os.path.join(pgpydir, key.fingerprint.keyid + ext)
+    return keypath
 
-    PGPy does not currently support file system keyring, therefore
-    keys must be imported/exported from/to files or GPG keyring.
 
-    .. todo::
-         * instead of storing the keys in files, they could be stored
-           in the autocrypt config.json file.
-         * it probably would be better to create an abstract class
-           as interface from which both BinGPG and PGPyCrypto inherit
-           and then implement specific methods for BinGPG and PGPyCrypto.
+def _save_key_to_file(key):
+    keypath = _key_path(key)
+    with open(keypath, 'wb') as fd:
+        fd.write(key_bytes(key))
+    return keypath
 
-    .. note::
-         * methods not shared with BinGPG API are named as private.
-         * some operations are kept for compatibility with BinGPG API,
-           but they do not really make sense with PGPy.
-    """
 
-    def __init__(self, homedir=None, gpgpath="gpg"):
-        """Init PGPyCrypto class.
+def list_packets_pgpy(keydata):
+    if isinstance(keydata, bytes):
+        data = bytearray(keydata)
+    elif isinstance(keydata, str):
+        data = Armorable.ascii_unarmor(keydata)['body']
+    packets = []
+    while data:
+        packets.append(Packet(data))
+    return packets
 
-        :param homedir: home dir
-        :type key: str
-        :param gpgpath: kept for compatibility with BinGPG API
-        :type gpgpath: str
 
-        """
-        # NOTE: called as .._pgpy.. to know that is instance of PGPKey
-        self.pgpydir = homedir
-        logger.debug('PGPyCrypto pgpydir %s', self.pgpydir)
-        self.memkr = PGPKeyring()
-        self._ensure_init()
+def _encrypt_with_key(data, key):
+    msg = PGPMessage.new(data)
+    pubkey = key if key.is_public else key.pubkey
+    cmsg = pubkey.encrypt(msg)
+    return cmsg
 
-    def __str__(self):
-        return "PGPyCrypto(homedir={homedir!r})".format(
-            homedir=self.pgpydir)
+##############################################################################
+# from here functions that need profile
 
-    def _ensure_init(self):
-        if self.pgpydir is None:
-            return
-        if not os.path.exists(self.pgpydir):
-            os.makedirs(self.pgpydir)
-            os.chmod(self.pgpydir, 0o700)
-        self._loadkr()
 
-    def _loadkr(self):
-        keyfiles = glob.glob(os.path.join(self.pgpydir, '*.asc'))
-        self.memkr.load(keyfiles)
+def _get_keydata_from_addr(profile, addr):
+    if profile[ACCOUNTS].get(addr):
+        return profile[ACCOUNTS][addr][SECKEY]
+    if profile[PEERS].get(addr):
+        return profile[PEERS][addr][PUBKEY]
+    return None
 
-    def _savekr(self):
-        # NOTE: saving secret keys in clear in the filesystem is a secuirty
-        # risk, but the generated keys with GPG are not passphrase protected
-        # and PGPY does not implement yet filesystem key ring
-        for fp in self.memkr.fingerprints():
-            with self.memkr.key(fp) as key:
-                self._save_key_to_file(key)
 
-    def _key_path(self, key):
-        ext = ''
-        if key.is_public is False:
-            ext = '.sec'
-        ext += '.asc'
-        keypath = os.path.join(self.pgpydir, key.fingerprint.keyid + ext)
-        return keypath
+def _get_key_from_addr(profile, addr):
+    keydata = _get_keydata_from_addr(profile, addr)
+    return _keydata2key(keydata) if keydata is not None else None
 
-    def _load_key_into_kr(self, key):
-        keypath = self._save_key_to_file(key)
-        self.memkr.load(keypath)
 
-    def _save_key_to_file(self, key):
-        keypath = self._key_path(key)
-        with open(keypath, 'wb') as fd:
-            fd.write(key_bytes(key))
-        return keypath
+def get_keydata(profile, addr):
+    return _get_keydata_from_addr(profile, addr)
 
-    def _gen_skey_usage_all(self, emailadr):
-        skey = PGPKey.new(SKEY_ALG, KEY_SIZE)
-        # NOTE: pgpy implements separate attributes for name and e-mail
-        # address. Name is mandatory.
-        # Here e-mail address is used for the attribute name,
-        # so that the uid is 'e-mail adress'.
-        # If name attribute would be set to empty string
-        # and email to the e-mail address, the uid would be
-        # ' <e-mail address>', which we do not want.
-        uid = PGPUID.new(emailadr)
-        skey.add_uid(uid, usage=SKEY_USAGE_ALL, **SKEY_ARGS)
-        return skey
+##############################################################################
 
-    def _gen_ssubkey(self):
-        # NOTE: the uid for the subkeys can be obtained with .parent,
-        # but, unlike keys generated with gpg, it's not printed when imported
-        # in gpg keyring and run --fingerprint.
-        # in case of adding uid to the subkey, it raises currently some
-        # exceptions depending on which are the arguments used, which are not
-        # clear from the documentation.
-        ssubkey = PGPKey.new(SKEY_ALG, KEY_SIZE)
-        return ssubkey
 
-    def _gen_skey_with_subkey(self, emailadr):
-        # NOTE: skey should be generated with usage sign, but otherwise
-        # encryption does not work currently.
-        skey = self._gen_skey_usage_all(emailadr)
-        ssubkey = self._gen_ssubkey()
-        skey.add_subkey(ssubkey, usage=SKEY_USAGE_ENC)
-        return skey
+def _get_keyhandle_from_addr(profile, addr):
+    key = _get_key_from_addr(profile, addr)
+    return key.fingerprint.keyid
 
-    def gen_secret_key(self, emailadr):
-        """Generate PGPKey object.
 
-        :param emailadr: e-mail address
-        :return: keyhandle
-        :type emailadr: string
-        :rtype: string
+def encrypt(profile, data, recipients):
+    assert len(recipients) >= 1
+    msg = data if isinstance(data, PGPMessage) else PGPMessage.new(data)
+    # pmsg |= seckey.sign(msg)
+    if len(recipients) == 1:
+        key = _get_key_from_addr(profile, recipients[0])
+        pubkey = key if key.is_public else key.pubkey
+        cmsg = pubkey.encrypt(msg)
+    else:
+        # The symmetric cipher should be specified, in case the first
+        # preferred cipher is not the same for all recipients public
+        # keys.
+        cipher = SymmetricKeyAlgorithm.AES256
+        sessionkey = cipher.gen_key()
+        cmsg = msg
+        for r in recipients:
+            key = _get_key_from_addr(r)
+            pubkey = key if key.is_public else key.pubkey
+            cmsg = pubkey.encrypt(cmsg, cipher=cipher,
+                                  sessionkey=sessionkey)
+        del sessionkey
+    assert cmsg.is_encrypted
+    return cmsg
 
-        """
-        skey = self._gen_skey_with_subkey(emailadr)
-        self._load_key_into_kr(skey)
-        return skey.fingerprint.keyid
 
-    def supports_eddsa(self):
-        # NOTE: PGPy does not currently support it
-        return False
+def sign(profile, data, addr):
+    key = _get_key_from_addr(profile, addr)
+    sig_data = key.sign(data)
+    return sig_data
 
-    def _get_key_from_keyhandle(self, keyhandle):
-        # NOTE: this is a bit unefficient, there should be other way to obtain
-        # a key from PGPKeyring
-        for fp in self.memkr.fingerprints():
-            with self.memkr.key(fp) as key:
-                if key.fingerprint.keyid == keyhandle:
-                    return key
-        return None
 
-    def _get_key_from_addr(self, addr):
-        # NOTE: this is a bit unefficient, there should be other way to obtain
-        # a key from PGPKeyring
-        with self.memkr.key(addr) as key:
-            return key
-        return None
+def sign_encrypt(profile, data, addr, recipients):
+    pmsg = PGPMessage.new(data)
+    sig = sign(profile, pmsg, addr)
+    pmsg |= sig
+    assert pmsg.is_signed
+    cmsg = encrypt(pmsg, recipients)
+    return cmsg
 
-    def _get_keyhandle_from_addr(self, addr):
-        key = self._get_key_from_addr(addr)
-        return key.fingerprint.keyid
 
-    def _get_fp_from_keyhandle(self, keyhandle):
-        # NOTE: this is a bit unefficient, there should be other way to obtain
-        # a key from PGPKeyring
-        for fp in self.memkr.fingerprints():
-            with self.memkr.key(fp) as key:
-                if key.fingerprint.keyid == keyhandle:
-                    return key.fingerprint
-        return None
+# def verify(profile, data, signature):
+#     sig = PGPSignature(signature) \
+#         if isinstance(signature, str) else signature
+#     keyhandle = sig.signer.email
+#     key = _get_key_from_keyhandle(keyhandle)
+#     seckey = key if key.is_public is False else key.pubkey
+#     ver = seckey.verify(data, signature)
+#     good = next(ver.good_signatures)
+#     return good.by
 
-    def _key_data(self, key, armor=False, b64=False):
-        assert isinstance(key, PGPKey)
-        if armor is True:
-            keydata = str(key)
-        else:
-            keydata = key_bytes(key)
-        return keydata if not b64 else b64encode_u(keydata)
 
-    def get_public_keydata(self, keyhandle=None, armor=False, b64=False):
-        key = self._get_key_from_keyhandle(keyhandle)
-        if key is not None:
-            pkey = key if key.is_public is True else key.pubkey
-            return self._key_data(pkey, armor, b64)
+def decrypt(profile, cdata, seckey=None):
+    cmsg = cdata if isinstance(cdata, PGPMessage) \
+        else PGPMessage.from_blob(cdata)
+    assert cmsg.is_encrypted
+    if seckey is None:
+        addr = cmsg.encrypters.pop().email
+        seckey = _get_key_from_addr(profile, addr)
+    out = seckey.decrypt(cmsg)
+    return out.message
 
-    def get_secret_keydata(self, keyhandle=None, armor=False):
-        key = self._get_key_from_keyhandle(keyhandle)
-        if key is not None:
-            skey = key if key.is_public is False else None
-            return self._key_data(skey, armor) if skey is not None else None
 
-    def list_secret_keyinfos(self, keyhandle=None):
-        args = [keyhandle] if keyhandle is not None else []
-        return self._parse_list(args, ("sec", "ssb"))
+def sym_encrypt(text, passphrase):
+    if isinstance(text, str):
+        text = PGPMessage.new(text)
+    cmsg = text.encrypt(passphrase, cipher=SymmetricKeyAlgorithm.AES128)
+    return cmsg
 
-    def list_public_keyinfos(self, keyhandle=None):
-        args = [keyhandle] if keyhandle is not None else []
-        return self._parse_list(args, ("pub", "sub"))
 
-    def _parse_list(self, args, types):
-        # NOTE: the subkeys have to be at the end of the list to pass
-        # the tests
-        keyhandle = args[0] if args else None
-        keyinfos = []
-        # NOTE: public keys with private key are not loaded in memkr, as the
-        # public part is in the private, so they have to be obtained from the
-        # from the private ones
-        keyhalf = 'public' if "pub" in types else 'private'
-        primaryfps = self.memkr.fingerprints(keytype='primary')
-        subfps = self.memkr.fingerprints(keytype='sub')
-        for fp in primaryfps:
-            with self.memkr.key(fp) as k:
-                if keyhalf is 'public':
-                    k = k.pubkey
-                if keyhandle is None or keyhandle == k.fingerprint.keyid:
-                    uid = k.userids[0].name
-                    keyinfos.append(KeyInfo(type=k.key_algorithm.value,
-                                            bits=k.key_size,
-                                            uid=uid,
-                                            id=k.fingerprint.keyid,
-                                            date_created=k.created))
-        for fp in subfps:
-            with self.memkr.key(fp) as k:
-                if keyhandle is None or \
-                        keyhandle == k.parent.fingerprint.keyid:
-                    uid = k.parent.userids[0].name
-                    if keyhalf is 'public':
-                        k = k.pubkey
-                    keyinfos.append(KeyInfo(type=k.key_algorithm.value,
-                                            bits=k.key_size,
-                                            uid=uid,
-                                            id=k.fingerprint.keyid,
-                                            date_created=k.created))
-        return keyinfos
-
-    def list_packets_pgpy(self, keydata):
-        if isinstance(keydata, bytes):
-            data = bytearray(keydata)
-        elif isinstance(keydata, str):
-            data = Armorable.ascii_unarmor(keydata)['body']
-        packets = []
-        while data:
-            packets.append(Packet(data))
-        return packets
-
-    def list_packets(self, keydata):
-        # NOTE: the previous function does not return packets as required by
-        # the test
-        # use gpg only here
-        import subprocess
-        key, _ = PGPKey.from_blob(keydata)
-        keypath = self._save_key_to_file(key)
-        sp = subprocess.Popen(['/usr/bin/gpg', '--list-packets', keypath],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = sp.communicate()
-        if sys.version_info >= (3, 0):
-            out = out.decode()
-        packets = []
-        lines = []
-        last_package_type = None
-        for rawline in out.splitlines():
-            line = rawline.strip()
-            c = line[0:1]
-            if c == "#":
-                continue
-            if c == ":":
-                i = line[1:].find(c)
-                if i != -1:
-                    ptype = line[1: i + 1]
-                    pvalue = line[i + 2:].strip()
-                    if last_package_type is not None:
-                        packets.append(last_package_type + (lines,))
-                        lines = []
-                    last_package_type = (ptype, pvalue)
-            else:
-                assert last_package_type, line
-                lines.append(line)
-        else:
-            packets.append(last_package_type + (lines,))
-        return packets
-
-    def _find_keyhandle(self, string,
-                        _pattern=re.compile("key (?:ID )?([0-9A-F]+)")):
-        # search for string like "key <longid/shortid>"
-        m = _pattern.search(string)
-        assert m and len(m.groups()) == 1, string
-        x = m.groups()[0]
-        # now search the fingerprint if we only have a shortid
-        if len(x) <= 8:
-            keyinfos = self.list_public_keyinfos(x)
-            for k in keyinfos:
-                if k.match(x):
-                    return k.id
-            raise ValueError("could not find fingerprint %r in %r" %
-                             (x, keyinfos))
-        # note that this might be a 16-char fingerprint or a 40-char one
-        # (gpg-2.1.18)
-        return x
-
-    def _encrypt_msg_with_pkey(self, data, key):
-        msg = PGPMessage.new(data)
-        pkey = key if key.is_public else key.pubkey
-        cmsg = pkey.encrypt(msg)
-        return cmsg
-
-    def encrypt(self, data, recipients):
-        assert len(recipients) >= 1
-        if not isinstance(data, PGPMessage):
-            msg = PGPMessage.new(data)
-        else:
-            msg = data
-        # cmsg |= self.pgpykey.sign(cmsg)
-        if len(recipients) == 1:
-            key = self._get_key_from_addr(recipients[0])
-            pkey = key if key.is_public else key.pubkey
-            cmsg = pkey.encrypt(msg)
-        else:
-            # The symmetric cipher should be specified, in case the first
-            # preferred cipher is not the same for all recipients public
-            # keys.
-            cipher = SymmetricKeyAlgorithm.AES256
-            sessionkey = cipher.gen_key()
-            cmsg = msg
-            for r in recipients:
-                key = self._get_key_from_addr(r)
-                pkey = key if key.is_public else key.pubkey
-                cmsg = pkey.encrypt(cmsg, cipher=cipher,
-                                    sessionkey=sessionkey)
-            del sessionkey
-        assert cmsg.is_encrypted
-        return str(cmsg)
-
-    def sign(self, data, keyhandle):
-        key = self._get_key_from_keyhandle(keyhandle)
-        sig_data = key.sign(data)
-        return sig_data
-
-    def sign_encrypt(self, data, keyhandle, recipients):
-        # pkey = p._get_key_from_keyhandle(keyhandle)
-        pgpymsg = PGPMessage.new(data)
-        sig = self.sign(pgpymsg, keyhandle)
-        pgpymsg |= sig
-        assert pgpymsg.is_signed
-        cmsg = self.encrypt(pgpymsg, recipients)
-        return cmsg
-
-    def _skeys(self):
-        skeys = []
-        secfps = self.memkr(keyhalf="private")
-        for fp in secfps:
-            with self.memkr.key(fp) as key:
-                skeys.append(key)
-        return skeys
-
-    def verify(self, data, signature):
-        sig = PGPSignature(signature) \
-            if isinstance(signature, str) else signature
-        keyhandle = sig.signer
-        key = self._get_key_from_keyhandle(keyhandle)
-        skey = key if key.is_public is False else key.pubkey
-        ver = skey.verify(data, signature)
-        good = next(ver.good_signatures)
-        return good.by
-
-    def decrypt(self, enc_data, skey=None):
-        if isinstance(enc_data, str):
-            cmsg = PGPMessage.from_blob(enc_data)
-        else:
-            cmsg = enc_data
-        assert cmsg.is_encrypted
-        if skey is None:
-            keyhandle = cmsg.encrypters.pop()
-            skey = self._get_key_from_keyhandle(keyhandle)
-        out = skey.decrypt(cmsg)
-        keyinfos = []
-        keyinfos.append(KeyInfo(skey.key_algorithm.name, skey.key_size,
-                                skey.fingerprint.keyid, skey.userids[0].name,
-                                skey.created))
-        return six.b(out.message), keyinfos
-
-    def import_keydata(self, keydata):
-        key, _ = PGPKey.from_blob(keydata)
-        self._load_key_into_kr(key)
-        return key.fingerprint.keyid
-
-    def sym_encrypt(self, text, passphrase):
-        if isinstance(text, str):
-            text = PGPMessage.new(text)
-        cmsg = text.encrypt(passphrase, cipher=SymmetricKeyAlgorithm.AES128)
-        return cmsg
-
-    def sym_decrypt(self, text, passphrase):
-        if isinstance(text, str):
-            text = PGPMessage.from_blob(text)
-        pmsg = text.decrypt(passphrase)
-        return pmsg
+def sym_decrypt(text, passphrase):
+    if isinstance(text, str):
+        text = PGPMessage.from_blob(text)
+    pmsg = text.decrypt(passphrase)
+    return pmsg

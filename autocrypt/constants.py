@@ -10,7 +10,6 @@ KEY_SIZE = 3072
 NOPREFERENCE = 'nopreference'
 MUTUAL = 'mutual'
 
-
 AC = 'Autocrypt'
 ADDR = 'addr'
 KEYDATA = 'keydata'
@@ -27,20 +26,21 @@ AC_GOSSIP_HEADER = "addr=%(addr)s; keydata=%(keydata)s"
 RESET = 'reset'
 GOSSIP = 'gossip'
 
-OWN_STATE = 'own_state'
-SECRET_KEY = 'secret_key'
-PUBLIC_KEY = 'public_key'
+ACCOUNTS = 'accounts'
+PEERS = 'peers'
+
+SECKEY = 'seckey'
+PUBKEY = 'pubkey'
 PREFER_ENCRYPT = 'prefer_encrypt'
+PREFERENCRYPT = 'preferencrypt'
 
 ACCOUNT_PE_TYPES = [NOPREFERENCE, MUTUAL]
 
-PEER_STATE = 'peer_state'
-LAST_SEEN = 'last_seen'
-LAST_SEEN_AC = 'last_seen_autocrypt'
-STATE = 'state'
+LASTSEEN = 'lastseen'
+ACTIMESTAMP = 'actimestamp'
+GOSSIPKEY = 'gossipkey'
+GOSSIPTS = 'gossiptimestamp'
 
-RESET = 'reset'
-GOSSIP = 'gossip'
 
 PEER_STATE_TYPES = [NOPREFERENCE, MUTUAL, RESET, GOSSIP]
 
@@ -90,3 +90,10 @@ AC_PASSPHRASE_NUM_BLOCKS = 3
 AC_PASSPHRASE_FORMAT = "Passphrase-Format: numeric9x4"
 AC_PASSPHRASE_BEGIN_LEN = 2
 AC_PASSPHRASE_BEGIN = "Passphrase-Begin: "
+
+PYAC_HOME = os.path.join(os.path.expanduser("~"), '.pyac')
+ACCOUNT_ATTRS = ["addr", "pr", "sk", "pk"]
+ACCOUNTS_PATH = os.path.join(PYAC_HOME, 'accounts.json')
+PEERS_PATH = os.path.join(PYAC_HOME, 'peers.json')
+PROFILE_PATH = os.path.join(PYAC_HOME, 'profile.json')
+INITIALDATA = os.path.join(BASE_DIR, 'data', 'intial_data.json')
