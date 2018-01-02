@@ -5,31 +5,31 @@
 """Functions to generate and parse encrypted Email following
  Autcrypt technical specifications.
 """
-
 import logging
 import logging.config
 import random
 import re
-
-from base64 import b64decode
 from email import policy
-from email.mime.text import MIMEText
 from email.message import Message
+from email.mime.text import MIMEText
 from email.parser import Parser
 
 from emailpgp.mime.multipartpgp import MIMEMultipartPGP
 
 from .acmime import MIMEMultipartACSetup
-from .constants import (ADDR, KEYDATA, AC_HEADER, AC_GOSSIP,
-                        AC_GOSSIP_HEADER, PE_HEADER_TYPES, NOPREFERENCE,
-                        AC_HEADER_PE, PE, AC, AC_PREFER_ENCRYPT_HEADER,
-                        AC_PASSPHRASE_LEN, AC_PASSPHRASE_WORD_LEN,
-                        AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_FORMAT,
-                        AC_PASSPHRASE_BEGIN_LEN, AC_PASSPHRASE_NUM_BLOCKS,
-                        AC_PASSPHRASE_BEGIN, AC_SETUP_INTRO, AC_SETUP_SUBJECT,
-                        AC_SETUP_MSG, LEVEL_NUMBER, ACCOUNTS, PEERS, SECKEY,
-                        PUBKEY)
-from .crypto import get_keydata
+from .constants import (AC, AC_GOSSIP, AC_GOSSIP_HEADER, AC_HEADER,
+                        AC_HEADER_PE, AC_PASSPHRASE_BEGIN,
+                        AC_PASSPHRASE_BEGIN_LEN, AC_PASSPHRASE_FORMAT,
+                        AC_PASSPHRASE_LEN, AC_PASSPHRASE_NUM_BLOCKS,
+                        AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_WORD_LEN,
+                        AC_PREFER_ENCRYPT_HEADER, AC_SETUP_INTRO, AC_SETUP_MSG,
+                        AC_SETUP_SUBJECT, ACCOUNTS, ADDR, KEYDATA,
+                        LEVEL_NUMBER, NOPREFERENCE, PE, PE_HEADER_TYPES, PEERS)
+from .crypto import (_get_seckey_from_addr, decrypt,
+                     get_own_public_keydata, get_peer_keydata,
+                     sign_encrypt, sym_decrypt,
+                     sym_encrypt)
+from .storage import new_peer
 
 logger = logging.getLogger(__name__)
 parser = Parser(policy=policy.default)
@@ -253,7 +253,7 @@ def gen_gossip_headervalue(addr, keydata):
 
 # NOTE: from here functions that needs crypo
 ##############################################
-def gen_ac_email(p, sender, recipients, subject, body, pe=None,
+def gen_ac_email(profile, sender, recipients, subject, body, pe=None,
                  date=None, _dto=False, message_id=None,
                  boundary=None, _extra=None):
     """Generate an Autocrypt Email.
@@ -261,13 +261,13 @@ def gen_ac_email(p, sender, recipients, subject, body, pe=None,
     :return: an Autocrypt encrypted Email
     :rtype: Message
     """
-    assert sender in p[ACCOUNTS].keys()
+    assert sender in profile[ACCOUNTS].keys()
     for r in recipients:
-        assert r in p[PEERS].keys()
-    keydata = get_keydata(p, sender)
+        assert r in profile[PEERS].keys()
+    keydata = get_own_public_keydata(profile, sender)
 
     data = MIMEText(body)
-    cmsg = p.sign_encrypt(data.as_bytes(), sender, recipients)
+    cmsg = sign_encrypt(profile, data.as_bytes(), sender, recipients)
     msg = gen_encrypted_email(str(cmsg), boundary)
     add_headers(msg, sender, recipients, subject, date, _dto,
                 message_id, _extra)
@@ -276,7 +276,7 @@ def gen_ac_email(p, sender, recipients, subject, body, pe=None,
     return msg
 
 
-def decrypt_email(msg, p, key=None):
+def decrypt_email(msg, profile, key=None):
     """Decrypt Email.
 
     :return: decrypted Email text
@@ -288,12 +288,12 @@ def decrypt_email(msg, p, key=None):
     for payload in msg.get_payload():
         if payload.get_content_type() == 'application/octet-stream':
             ct = payload.get_payload()
-    pt = p.decrypt(ct, key)
+    pt = decrypt(profile, ct, key)
     logger.info('Decrypted Email.')
-    return pt.decode()
+    return pt
 
 
-def parse_ac_email(msg, p):
+def parse_ac_email(msg, profile):
     """Parse an Autocrypt Email.
 
     :return: an Autocrypt Email Message and decrypted body
@@ -306,16 +306,18 @@ def parse_ac_email(msg, p):
     else:
         # TODO: error
         logger.error('There is more than one Autocrypt header.')
-    p.import_keydata(b64decode(ac_headervaluedict['keydata']))
+    new_peer(profile, ac_headervaluedict['addr'],
+             ac_headervaluedict['keydata'],
+             ac_headervaluedict['prefer-encrypt'])
+    # TODO: add lastseen datetime.utcnow())
     logger.debug('Imported keydata from Autcrypt header.')
-    key = get_seckey_from_msg(msg, p)
-
-    pt = decrypt_email(msg, p, key)
+    key = get_seckey_from_msg(msg, profile)
+    pt = decrypt_email(msg, profile, key)
     logger.info('Parsed Autocrypt Email.')
     return pt
 
 
-def gen_gossip_headervalues(recipients, p):
+def gen_gossip_headervalues(recipients, profile):
     """Generate Autcrypt Gossip header values.
 
     :return: Autcrypt Gossip header values in the form:
@@ -325,8 +327,7 @@ def gen_gossip_headervalues(recipients, p):
     gossip_list = []
     for r in recipients:
         logger.debug('Generating Gossip header for recipient:\n%s', r)
-        keyhandle = p._get_keyhandle_from_addr(r)
-        keydata = p.get_public_keydata(keyhandle, b64=True)
+        keydata = get_peer_keydata(profile, r)
         g = gen_gossip_headervalue(r, keydata)
         gossip_list.append(g)
     return gossip_list
@@ -344,45 +345,39 @@ def parse_gossip_list_from_msg(msg):
     return gossip_list
 
 
-def store_keys_from_gossiplist(gossip_list, p):
+def store_keys_from_gossiplist(gossip_list, profile):
     for g in gossip_list:
         g_dict = parse_header_value(g)
-        k = g_dict['keydata']
         logger.debug('Import keydata from Gossip header.')
-        p.import_keydata(b64decode(k))
+        new_peer(profile, g_dict['addr'], g_dict['keydata'])
 
 
-def get_seckey_from_msg(msg, p):
+def get_seckey_from_msg(msg, profile):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     for recipient in msg['To'].split(', '):
-        key = p._get_key_from_addr(recipient)
-        if key is not None:
-            if key.is_public:
-                key = p._get_key_from_keyhandle(key.fingerprint.keyid)
-                if key is not None:
-                    logger.debug('Found private key for recipient %s',
-                                 recipient)
-                    return key
-            else:
-                return key
+        logger.debug('Searching seckey for recipient %s', recipient)
+        skey = _get_seckey_from_addr(profile, recipient)
+        if skey is not None:
+            logger.debug('Found key for addr %s', recipient)
+            return skey
     return None
 
 
-def parse_gossip_ct(msg, p, key=None):
+def parse_gossip_ct(msg, profile, key=None):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
-    pt = decrypt_email(msg, p, key)
+    pt = decrypt_email(msg, profile, key)
     # NOTE: hacky workaround, because "\n" is added after "; ""
     pt = pt.replace(
         ";\n keydata|;\r keydata|;\r\n keydata|;\n\r keydata", "; keydata")
     pmsg = parser.parsestr(pt)
     gossip_list = parse_gossip_list_from_msg(pmsg)
     logger.debug('gossip_list %s', gossip_list)
-    store_keys_from_gossiplist(gossip_list, p)
+    store_keys_from_gossiplist(gossip_list, profile)
     logger.info('Parsed Autocrypt Gossip Email with content: %s', pt)
     return pt
 
 
-def parse_gossip_email(msg, p):
+def parse_gossip_email(msg, profile):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     ac_headers = parse_ac_headers(msg)
     if len(ac_headers) == 1:
@@ -390,15 +385,18 @@ def parse_gossip_email(msg, p):
     else:
         # TODO: error
         ac_headervaluedict = ac_headers[0]
-    p.import_keydata(b64decode(ac_headervaluedict['keydata']))
+    new_peer(profile, ac_headervaluedict['addr'],
+             ac_headervaluedict['keydata'],
+             ac_headervaluedict['prefer-encrypt'])
+    # TODO: add lastseen datetime.utcnow())
     logger.debug('Imported keydata from Autocrypt header.')
-    key = get_seckey_from_msg(msg, p)
-    pt = parse_gossip_ct(msg, p, key)
+    key = get_seckey_from_msg(msg, profile)
+    pt = parse_gossip_ct(msg, profile, key)
     return pt
 
 
-def gen_gossip_pt_email(recipients, body, p):
-    gossip_headers = gen_gossip_headervalues(recipients, p)
+def gen_gossip_pt_email(recipients, body, profile):
+    gossip_headers = gen_gossip_headervalues(recipients, profile)
     logger.debug('gossip headers %s', gossip_headers)
     msg = MIMEText(body)
     for g in gossip_headers:
@@ -406,17 +404,16 @@ def gen_gossip_pt_email(recipients, body, p):
     return msg
 
 
-def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
+def gen_gossip_email(sender, recipients, profile, subject, body, pe=None,
                      keyhandle=None, date=None, _dto=False, message_id=None,
                      boundary=None, _extra=None):
     """."""
-    if keyhandle is None:
-        keyhandle = p._get_keyhandle_from_addr(sender)
-    keydata = p.get_public_keydata(keyhandle, b64=True)
+    keydata = get_own_public_keydata(profile, sender)
 
-    pmsg = gen_gossip_pt_email(recipients, body, p)
+    pmsg = gen_gossip_pt_email(recipients, body, profile)
+    logger.debug('pmsg %s', pmsg)
+    pgpymsg = sign_encrypt(profile, pmsg.as_bytes(), sender, recipients)
 
-    pgpymsg = p.sign_encrypt(pmsg.as_bytes(), keyhandle, recipients)
     cmsg = gen_encrypted_email(str(pgpymsg), boundary=boundary)
     add_headers(cmsg, sender, recipients, subject,
                 date, _dto, message_id, _extra)
@@ -427,12 +424,10 @@ def gen_gossip_email(sender, recipients, p, subject, body, pe=None,
     return cmsg
 
 
-def gen_ac_setup_ct(sender, pe, p, keyhandle=None):
-    if keyhandle is None:
-        keyhandle = p._get_keyhandle_from_addr(sender)
-    seckey = p.get_secret_keydata(keyhandle, armor=True)
+def gen_ac_setup_ct(sender, pe, profile, keyhandle=None):
+    seckey = str(_get_seckey_from_addr(profile, sender))
     seckey_list = seckey.split('\n')
-    seckey_list.insert(2, AC_PREFER_ENCRYPT_HEADER + pe)
+    seckey_list.insert(1, AC_PREFER_ENCRYPT_HEADER + pe)
     ac_setup_ct = "\n".join(seckey_list)
     return ac_setup_ct
 
@@ -450,23 +445,24 @@ def gen_ac_setup_passphrase():
     return passphrase_blocks
 
 
-def gen_ac_setup_payload(ac_setup_ct, passphrase, p):
-    ct = p.sym_encrypt(ac_setup_ct, passphrase)
+def gen_ac_setup_payload(ac_setup_ct, passphrase, profile):
+    ct = sym_encrypt(ac_setup_ct, passphrase)
     ctlist = str(ct).split('\n')
-    ctlist.insert(2, AC_PASSPHRASE_FORMAT + "\n" +
+    ctlist.insert(1, AC_PASSPHRASE_FORMAT + "\n" +
                   AC_PASSPHRASE_BEGIN +
                   passphrase[:AC_PASSPHRASE_BEGIN_LEN])
     ac_setup_ct = "\n".join(ctlist)
     return AC_SETUP_INTRO + "\n" + ac_setup_ct
 
 
-def gen_ac_setup_email(sender, pe, p, subject=AC_SETUP_SUBJECT, body=None,
+def gen_ac_setup_email(sender, pe, profile, subject=AC_SETUP_SUBJECT,
+                       body=None,
                        keyhandle=None, date=None, _dto=False, message_id=None,
                        boundary=None, _extra=None, passphrase=None):
     passphrase = passphrase or gen_ac_setup_passphrase()
-    ac_setup_ct = gen_ac_setup_ct(sender, pe, p, keyhandle)
+    ac_setup_ct = gen_ac_setup_ct(sender, pe, profile, keyhandle)
     ac_setup_payload = gen_ac_setup_payload(ac_setup_ct,
-                                            passphrase, p)
+                                            passphrase, profile)
     msg = MIMEMultipartACSetup(ac_setup_payload, boundary=boundary)
     if _extra is None:
         _extra = {}
@@ -482,7 +478,7 @@ def parse_ac_setup_header(msg):
     return msg.get(AC_SETUP_MSG)
 
 
-def parse_ac_setup_ct(ct, passphrase, p):
+def parse_ac_setup_ct(ct, passphrase, profile):
     ctlist = ct.split('\n')
     pass_format = ctlist.pop(2)
     if pass_format != AC_PASSPHRASE_FORMAT:
@@ -494,7 +490,7 @@ def parse_ac_setup_ct(ct, passphrase, p):
             passphrase[:AC_PASSPHRASE_BEGIN_LEN]:
         logger.error('The passphrase is invalid.')
     logger.debug('Encrypted part without headers %s', "\n".join(ctlist))
-    pmsg = p.sym_decrypt("\n".join(ctlist), passphrase)
+    pmsg = sym_decrypt("\n".join(ctlist), passphrase)
     return pmsg
 
 
@@ -515,7 +511,7 @@ def parse_ac_setup_payload(payload):
     return ct
 
 
-def parse_ac_setup_email(msg, p, passphrase):
+def parse_ac_setup_email(msg, profile, passphrase):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     if msg.get(AC_SETUP_MSG) != LEVEL_NUMBER:
         logger.error('This is not an Autocrypt Setup Message v1')
@@ -523,27 +519,28 @@ def parse_ac_setup_email(msg, p, passphrase):
     logger.info(description.as_string())
 
     ct = parse_ac_setup_payload(payload)
-    pmsg = parse_ac_setup_ct(ct, passphrase, p)
-    p.import_keydata(pmsg.message)
+    pmsg = parse_ac_setup_ct(ct, passphrase, profile)
+    logger.debug('pmsg %s', pmsg)
+    # import_keydata(profile, pmsg.message)
     logger.info('Parsed Autocrypt Setup Email, encrypted content:\n%s',
                 pmsg.message)
     return pmsg.message
 
 
-def parse_email(msg, p, passphrase=None):
+def parse_email(msg, profile, passphrase=None):
     msg = msg if isinstance(msg, Message) else parser.parsestr(msg)
     if msg.get(AC_SETUP_MSG) == LEVEL_NUMBER:
         logger.info('Email is an Autocrypt Setup Message.')
         if passphrase is None:
             passphrase = input('Introduce the passphrase:\n')
-        return parse_ac_setup_email(msg, p, passphrase)
+        return parse_ac_setup_email(msg, profile, passphrase)
     elif msg.get(AC) is not None:
         logger.info('Email contains Autocrypt headers.')
-        pt = parse_ac_email(msg, p)
+        pt = parse_ac_email(msg, profile)
         logger.debug('pt %s', pt)
         if parser.parsestr(pt).get(AC_GOSSIP) is not None:
-            return parse_gossip_email(msg, p)
+            return parse_gossip_email(msg, profile)
         return pt
     if msg.get(AC_GOSSIP) is not None:
         logger.info('Email contains Autocrypt Gossip headers.')
-        return parse_gossip_email(msg, p)
+        return parse_gossip_email(msg, profile)

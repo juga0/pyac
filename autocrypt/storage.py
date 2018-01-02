@@ -4,36 +4,40 @@
 # Copyright 2017 juga (juga at riseup dot net), under MIT license.
 """.
 """
-import logging
 import json
+import logging
 import os
 import os.path
-from shutil import copyfile
 
 from .conflog import LOGGING
 from .constants import (ACCOUNTS, ACTIMESTAMP, GOSSIPKEY, GOSSIPTS,
-                        INITIALDATA, LASTSEEN, NOPREFERENCE, PEERS,
+                        LASTSEEN, NOPREFERENCE, PEERS,
                         PREFERENCRYPT, PROFILE_PATH, PUBKEY, SECKEY)
-from .crypto_func import gen_key, _key2keydatas
+from .crypto import _key2keydatas, gen_key
 
 logging.config.dictConfig(LOGGING)
-logger = logging.getLogger('autocrypt')
+logger = logging.getLogger(__name__)
 
 
-def save(datadict, jpath=PROFILE_PATH):
+def save(datadict):
+    jpath = datadict['path']
     if not os.path.exists(os.path.dirname(jpath)):
         os.makedirs(jpath)
-        copyfile(INITIALDATA, jpath)
     with open(jpath, 'w') as fp:
         json.dump(datadict, fp, indent=2)
     logger.debug('Wrote profile in %s', jpath)
 
 
+def init_profile(path=PROFILE_PATH):
+    return {'path': path, ACCOUNTS: {}, PEERS: {}}
+
+
 def load(jpath=PROFILE_PATH):
     if not os.path.isfile(jpath):
-        return {ACCOUNTS: {}, PEERS: {}}
+        return init_profile()
     with open(jpath) as fp:
         return json.load(fp)
+    logger.debug('Loaded profile from %s', jpath)
 
 
 def new_account(profile, addr, sk=None, pk=None, pe=None):

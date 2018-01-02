@@ -5,3 +5,4 @@ dist
 build
 .cache
 .tox
+tests/data/pgphome

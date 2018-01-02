@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:expandtab
 
-import itertools
 import pytest
-from autocrypt.crypto import PGPyCrypto
+
+from autocrypt.storage import load
 
 
 @pytest.fixture
@@ -38,35 +38,14 @@ def datadir(request):
 
 
 @pytest.fixture
-def crypto_maker(request, tmpdir, datadir):
-    """Return a function which creates initialized PGPyCrypto instances."""
-    counter = itertools.count()
-
-    def maker(native=False, pgphome=None):
-        if pgphome:
-            p = datadir.join('pgphome')
-        else:
-            p = tmpdir.join("pgpycrypto%d" % next(counter))
-        pgpycrypto = PGPyCrypto(p)
-        return pgpycrypto
-    return maker
-
-
-@pytest.fixture
-def pgpycrypto(crypto_maker):
-    """Return an initialized pgpycrypto instance."""
-    return crypto_maker()
-
-
-@pytest.fixture
-def pgphome_maker(request, datadir):
+def profile_maker(request, datadir):
     def maker():
-        p = datadir.join('pgphome')
-        pgpycrypto = PGPyCrypto(p)
-        return pgpycrypto
+        path = datadir.join('profile.json')
+        profile = load(path)
+        return profile
     return maker
 
 
 @pytest.fixture
-def pcrypto(pgphome_maker):
-    return pgphome_maker()
+def profile(profile_maker):
+    return profile_maker()
