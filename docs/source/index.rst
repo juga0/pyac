@@ -11,7 +11,10 @@ Welcome to PyAC's documentation!
    :caption: Contents:
 
    install
+   run
+   diagrams
    api
+   todo
 
 
 Indices and tables
