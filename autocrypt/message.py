@@ -428,6 +428,10 @@ def gen_ac_setup_ct(sender, pe, profile, keyhandle=None):
     seckey = str(_get_seckey_from_addr(profile, sender))
     seckey_list = seckey.split('\n')
     seckey_list.insert(1, AC_PREFER_ENCRYPT_HEADER + pe)
+    # NOTE: for compatibility with older PGPy versions that
+    # insert the version in the CT
+    if seckey_list[2].startswith('Version: PGPy '):
+        seckey_list.pop(2)
     ac_setup_ct = "\n".join(seckey_list)
     return ac_setup_ct
 
@@ -448,6 +452,10 @@ def gen_ac_setup_passphrase():
 def gen_ac_setup_payload(ac_setup_ct, passphrase, profile):
     ct = sym_encrypt(ac_setup_ct, passphrase)
     ctlist = str(ct).split('\n')
+    # NOTE: for compatibility with older PGPy versions that
+    # insert the version in the CT
+    if ctlist[1].startswith('Version: PGPy '):
+        ctlist.pop(1)
     ctlist.insert(1, AC_PASSPHRASE_FORMAT + "\n" +
                   AC_PASSPHRASE_BEGIN +
                   passphrase[:AC_PASSPHRASE_BEGIN_LEN])
