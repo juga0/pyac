@@ -1,0 +1,17 @@
+[run]
+branch = True
+source = autocrypt
+parallel = True
+
+[paths]
+source =
+    autocrypt
+   .tox/*/lib/python*/site-packages/autocrypt
+   .tox/*/lib/site-packages/autocrypt
+   .tox/pypy*/site-packages/autocrypt
+
+[report]
+omit =
+    */tests/*
+    */python?.?/*
+    *__init__*

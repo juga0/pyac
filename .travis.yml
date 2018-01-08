@@ -1,17 +1,25 @@
-sudo: required
 language: python
+sudo: required
 dist: trusty
 python:
     - '3.6'
 
+before_install:
+    - sudo apt update && sudo apt install -y inkscape
+
 install:
-  - pip install -U tox
+    - pip install -e .; pip install ".[test]"; \
+      pip install ".[doc]"; pip install ".[dev]"
 
 env:
-  matrix:
-    - TESTENV=doc
-    - TESTENV=py36
-    - TESTENV=lint
+    - TOX_ENV=lint
+    - TOX_ENV=py36,stats
+    - TOX_ENV=doc
 
 script:
-  - tox -e $TESTENV tests/
+  - tox -c tox.ini -e $TOX_ENV
+  # - coverage run --source=pyac setup.py test
+
+after_success:
+  - coveralls
+  - codecov
