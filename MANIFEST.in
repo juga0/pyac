@@ -4,8 +4,6 @@ include *.rst
 include tox.ini
 recursive-include tests example-*.eml
 recursive-include tests *.py
-recursive-include tests *.secretkey
-recursive-include tests *.sec.asc
 recursive-include tests *.json
 include tests/data/*.key
 recursive-include docs *.bat
