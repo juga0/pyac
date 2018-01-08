@@ -162,8 +162,6 @@ def test_gen_ac_setup_email(profile, datadir):
         keyhandle='71DBC5657FDE65A7',
         boundary='Y6fyGi9SoGeH8WwRaEdC6bbBcYOedDzrQ',
         passphrase=PASSPHRASE)
-    with open('foo', 'w') as f:
-        f.write(ac_setup_email.as_string())
     assert ac_setup_email.as_string().split('\n')[:33] == \
         datadir.read('example-setup-message-pyac.eml').split('\n')[:33]
 

@@ -2,10 +2,12 @@ include *.txt
 include LICENSE
 include *.rst
 include tox.ini
-recursive-include tests example-*.eml
+recursive-include tests *.eml
 recursive-include tests *.py
 recursive-include tests *.json
 include tests/data/*.key
+recursive-include docs *.pdf
+recursive-include docs *.svg
 recursive-include docs *.bat
 recursive-include docs *.py
 recursive-include docs *.rst
