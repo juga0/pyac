@@ -1,7 +1,6 @@
 import os
 from setuptools import setup
 
-
 def main():
     with open(os.path.join("autocrypt", "__init__.py")) as f:
         for line in f:
@@ -13,7 +12,7 @@ def main():
         long_desc = f.read()
 
     setup(
-        name='pyac',
+        name='PyAC',
         description='Autocrypt Level 1 implemention using PGPy',
         long_description=long_desc,
         version=version,

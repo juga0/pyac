@@ -4,9 +4,6 @@ dist: trusty
 python:
     - '3.6'
 
-before_install:
-    - sudo apt update && sudo apt install -y inkscape
-
 install:
     - pip install -e .; pip install ".[test]"; \
       pip install ".[doc]"; pip install ".[dev]"
