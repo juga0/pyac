@@ -1,6 +1,7 @@
 import os
 from setuptools import setup
 
+
 def main():
     with open(os.path.join("autocrypt", "__init__.py")) as f:
         for line in f:
@@ -27,14 +28,15 @@ def main():
                      'Topic :: Utilities',
                      'Topic :: Communications :: Email',
                      'Intended Audience :: Developers',
+                     'Programming Language :: Python :: 3.5',
                      'Programming Language :: Python :: 3.6'],
         packages=['autocrypt'],
         entry_points='''
             [console_scripts]
             autocrypt=autocrypt.cli:main
         ''',
-        install_requires=["click>=6.0", "six", "PGPy>=0.4.1", "emailpgp",
-                          "attr"],
+        install_requires=["click>=6.0", "six", "PGPy>=0.4.1",
+                          "emailpgp>=0.2.1", "attr"],
         extras_require={
             'dev': ['ipython', 'pyflakes', 'pep8'],
             'test': ['tox', 'pytest'],
