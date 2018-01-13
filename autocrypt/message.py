@@ -78,7 +78,11 @@ def gen_headervaluestr_from_headervaluedict(headervaluedict):
     :return: Email header value in the form: "k=v; k=v;..."
     :rtype: str
     """
-    return "; ".join(["=".join([k, v]) for k, v in headervaluedict.items()])
+    # NOTE: next line makes header attrs non-deterministic
+    # return "; ".join(["=".join([k, v]) for k, v in headervaluedict.items()])
+    return "; ".join(["=".join([i, headervaluedict[i]]) for i in
+                      ['addr', 'prefer-encrypt', 'keydata']
+                      if i in headervaluedict.keys()])
 
 
 def parse_header_value(headervaluestr):
