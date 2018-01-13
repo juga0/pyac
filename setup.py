@@ -42,6 +42,7 @@ def main():
             'test': ['tox', 'pytest'],
             'doc': ['sphinx', 'pylint']
         },
+        python_requires=">=3.5",
         tests_require=['pytest'],
         zip_safe=False,
     )
