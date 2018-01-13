@@ -1,4 +1,7 @@
-from email import policy, encoders
+# -*- coding: utf-8 -*-
+# vim:ts=4:sw=4:expandtab
+# Copyright 2016, 2017 juga (juga at riseup dot net), MIT license.
+from email import encoders  # ,policy
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -10,9 +13,9 @@ class MIMEMultipartACSetup(MIMEMultipart):
     """
     Base class for MIME multipart/mixed including application/autocrypt-setup.
     """
-
+    # NOTE: policy is only introduced in Python3.6 (policy=policy.default)
     def __init__(self, _data=None, _subtype='mixed', boundary=None,
-                 *, policy=policy.default, **_params):
+                 **_params):
         """Creates a multipart/mixed type message containing
         application/autocrypt-setup.
 
@@ -43,8 +46,9 @@ class MIMEMultipartACSetup(MIMEMultipart):
         payload.add_header("Content-Disposition", 'attachment',
                            filename=AC_CT_SETUP_FN)
         _subparts = [description, payload]
+        # policy is only introduced in Python3.6 (policy=policy)
         MIMEMultipart.__init__(self, _subtype, boundary, _subparts,
-                               policy=policy, **_params)
+                               **_params)
 
 
 class MIMEApplicationACSetupPayload(MIMEApplication):
@@ -52,7 +56,8 @@ class MIMEApplicationACSetupPayload(MIMEApplication):
 
     def __init__(self, _data,
                  _subtype=AC_CT_SETUP,
-                 _encoder=encoders.encode_noop, *, policy=None, **_params):
+                 _encoder=encoders.encode_noop, **_params):
+        # policy=None,
         """Create an application/autocrypt-setup type MIME document.
 
         _data is a string containing the raw application data.
@@ -73,8 +78,9 @@ class MIMEApplicationACSetupPayload(MIMEApplication):
         # filename param without quoting.
         # _params["Content-Disposition"] = \
         #     'attachment; filename="autocrypt-setup-message.html"''
+        # policy=policy,
         MIMEApplication.__init__(self, _data, _subtype, _encoder,
-                                 policy=policy, **_params)
+                                 **_params)
 
 
 class MIMETextACSetupDescription(MIMEText):
