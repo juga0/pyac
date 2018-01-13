@@ -158,7 +158,7 @@ def test_gen_ac_setup_payload(profile, datadir):
 def test_gen_ac_setup_email(profile, datadir):
     ac_setup_email = gen_ac_setup_email(
         ALICE, MUTUAL, profile,
-        date="Sun, 05 Nov 2017 08:44:38 GMT",
+        date="Sun, 05 Nov 2017 08:44:38 +0000",
         keyhandle='71DBC5657FDE65A7',
         boundary='Y6fyGi9SoGeH8WwRaEdC6bbBcYOedDzrQ',
         passphrase=PASSPHRASE)
