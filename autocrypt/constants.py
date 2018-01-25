@@ -50,7 +50,7 @@ RECOMMENDATION = 'recommendation'
 
 DISABLE = 'disable'
 DISCOURAGE = 'discourage'
-AVAILABE = 'available'
+AVAILABLE = 'available'
 ENCRYPT = 'encrypt'
 
 AC_PREFER_ENCRYPT_HEADER = 'Autocrypt-Prefer-Encrypt: '

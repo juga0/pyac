@@ -13,7 +13,8 @@ from .conflog import LOGGING
 from .constants import (ACCOUNTS, ACTIMESTAMP, GOSSIPKEY, GOSSIPTS,
                         LASTSEEN, NOPREFERENCE, PEERS,
                         PREFERENCRYPT, PROFILE_PATH, PUBKEY, SECKEY)
-from .crypto import _key2keydatas, gen_key
+from .crypto import _key2keydatas, gen_key, key_fingerprint
+from .string_util import unwrap
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
@@ -77,17 +78,33 @@ def del_peer(profile, addr):
 
 def repr_account(profile, addr):
     s = "\n{}\n--------------------\n".format(addr)
-    s += "\n".join([": ".join([k, str(v)])
-                    for k, v in profile[ACCOUNTS][addr].items()
-                    if k not in [PUBKEY, SECKEY]])
+    # s += "\n".join([": ".join([k, str(v)])
+    #                 for k, v in profile[ACCOUNTS][addr].items()
+    #                 if k not in [PUBKEY, SECKEY]])
+    kv = []
+    for k, v in profile[ACCOUNTS][addr].items():
+        if k == PUBKEY:
+            kv.append(key_fingerprint(unwrap(k)) + ": " + str(v))
+        elif k == SECKEY:
+            break
+        else:
+            kv.append(k + ": " + str(v))
+    s += "\n".join(kv)
     return s
 
 
 def repr_peer(profile, addr):
     s = "\n{}\n--------------------\n".format(addr)
-    s += "\n".join([": ".join([k, str(v)])
-                    for k, v in profile[PEERS][addr].items()
-                    if k not in [PUBKEY, GOSSIPKEY]])
+    # s += "\n".join([": ".join([k, str(v)])
+    #                 for k, v in profile[PEERS][addr].items()
+    #                 if k not in [PUBKEY, GOSSIPKEY]])
+    kv = []
+    for k, v in profile[PEERS][addr].items():
+        if k == PUBKEY or k == GOSSIPKEY:
+            kv.append(key_fingerprint(unwrap(k)) + ": " + str(v))
+        else:
+            kv.append(k + ": " + str(v))
+    s += "\n".join(kv)
     return s
 
 

@@ -9,6 +9,7 @@ import logging
 import logging.config
 import random
 import re
+from datetime import datetime, timedelta
 from email import policy
 from email.message import Message
 from email.mime.text import MIMEText
@@ -23,13 +24,14 @@ from .constants import (AC, AC_GOSSIP, AC_GOSSIP_HEADER, AC_HEADER,
                         AC_PASSPHRASE_LEN, AC_PASSPHRASE_NUM_BLOCKS,
                         AC_PASSPHRASE_NUM_WORDS, AC_PASSPHRASE_WORD_LEN,
                         AC_PREFER_ENCRYPT_HEADER, AC_SETUP_INTRO, AC_SETUP_MSG,
-                        AC_SETUP_SUBJECT, ACCOUNTS, ADDR, KEYDATA,
-                        LEVEL_NUMBER, NOPREFERENCE, PE, PE_HEADER_TYPES, PEERS)
-from .crypto import (_get_seckey_from_addr, decrypt,
-                     get_own_public_keydata, get_peer_keydata,
-                     sign_encrypt, sym_decrypt,
-                     sym_encrypt)
+                        AC_SETUP_SUBJECT, ACCOUNTS, ACTIMESTAMP, ADDR,
+                        AVAILABLE, DISABLE, DISCOURAGE, ENCRYPT, GOSSIPKEY,
+                        KEYDATA, LASTSEEN, LEVEL_NUMBER, MUTUAL, NOPREFERENCE,
+                        PE, PE_HEADER_TYPES, PEERS, PUBKEY)
+from .crypto import (_get_seckey_from_addr, decrypt, get_own_public_keydata,
+                     get_peer_keydata, sign_encrypt, sym_decrypt, sym_encrypt)
 from .storage import new_peer
+from .string_util import wrap, unwrap
 
 logger = logging.getLogger(__name__)
 parser = Parser(policy=policy.default)
@@ -47,29 +49,6 @@ __all__ = ['wrap', 'unwrap', 'gen_headervaluestr_from_headervaluedict',
            'gen_gossip_pt_email', 'gen_gossip_email',
            'gen_ac_setup_ct', 'gen_ac_setup_passphrase',
            'gen_ac_setup_payload', 'gen_ac_setup_email', 'parse_email']
-
-
-def wrap(text, maxlen=76, wrapstr=" "):
-    """Wrap string to maxlen using wrapstr as separator.
-
-    :param text: text to wrap
-    :type text: string
-    :param maxlen: maximum length
-    :type maxlen: integer
-    :param wrapstr: character(s) to wrap the text with
-    :type pe: string
-    :return: wrappedstr text
-    :rtype: string
-    """
-
-    assert "\n" not in text
-    return wrapstr + wrapstr.join([text[0 + i:maxlen + i]
-                                   for i in range(0, len(text), maxlen)])
-
-
-def unwrap(text, wrapstr='\n '):
-    """Unwrap text wrapped with wrapstr."""
-    return text.replace(wrapstr, '').strip()
 
 
 def gen_headervaluestr_from_headervaluedict(headervaluedict):
@@ -556,3 +535,92 @@ def parse_email(msg, profile, passphrase=None):
     if msg.get(AC_GOSSIP) is not None:
         logger.info('Email contains Autocrypt Gossip headers.')
         return parse_gossip_email(msg, profile)
+
+
+def is_reply_to_ct(reply_to):
+    # TODO: implement
+    return False
+
+
+def recommendation(profile, sender, recipients, subject, body, pe=None,
+                   date=None, _dto=False, message_id=None,
+                   boundary=None, reply_to=None, reply_to_ct=None,
+                   extra=None):
+    """
+
+    Keyword arguments:
+    :returns:
+    ui-recommendation {disable, discourage, available, encrypt}
+    a single state recommending the state of the encryption user interface,
+    described below.
+    target-keys: a map of recipient addresses to public keys
+    """
+    reply_to_ct = False if reply_to is None else is_reply_to_ct(reply_to)
+    if len(recipients) == 1:
+        return recommendation_single(profile, sender, recipients[0],
+                                     reply_to_ct)
+    elif len(recipients) >= 1:
+        return recommendation_multi(profile, sender, recipients, reply_to_ct)
+
+
+def recommendation_single(profile, sender, to_addr, reply_to_ct):
+    # TODO: specs consider here revoked, expired, so they should be also
+    # consider when storing
+    if profile[PEERS].get(to_addr) is None or \
+            (profile[PEERS][to_addr][GOSSIPKEY] is None and
+             profile[PEERS][to_addr][PUBKEY] is None):
+        return (DISABLE, None)
+    preliminary_recommendation, target_keys = \
+        recommendation_single_phase1(profile, to_addr)
+    return recommendation_single_phase2(profile, sender, to_addr, reply_to_ct,
+                                        preliminary_recommendation,
+                                        target_keys)
+
+
+def recommendation_single_phase1(profile, to_addr):
+    logger.debug('Single recipient recommendation phase 1.')
+    target_keys = {}
+    if profile[PEERS][to_addr][PUBKEY] is None:
+        target_keys[to_addr] = profile[PEERS][to_addr][GOSSIPKEY]
+        return (DISCOURAGE, target_keys)
+    target_keys[to_addr] = profile[PEERS][to_addr][PUBKEY]
+    if profile[PEERS][to_addr].get(ACTIMESTAMP) is not None and \
+            profile[PEERS][to_addr].get(LASTSEEN) is not None and \
+            (profile[PEERS][to_addr].get(ACTIMESTAMP) -
+             profile[PEERS][to_addr].get(LASTSEEN) >
+             datetime.timedelta(days=35)):
+        return (DISCOURAGE, target_keys)
+    return (AVAILABLE, target_keys)
+
+
+def recommendation_single_phase2(profile, sender, to_addr, reply_to_ct,
+                                 preliminary_recommendation, target_keys):
+    # NOTE: preliminary_recommendation should not be something else than these
+    # at this point
+    # if (preliminary_recommendation in [AVAILABLE, DISCOURAGE] and
+    #     reply_to_ct is True) or (
+    #     preliminary_recommendation == AVAILABLE and
+    #     profile[PEERS][to_addr][PE] == MUTUAL and
+    #     profile[ACCOUNTS][sender][PE] == MUTUAL):
+    assert preliminary_recommendation in [DISCOURAGE, AVAILABLE]
+    if reply_to_ct is True or (preliminary_recommendation == AVAILABLE and
+                               profile[PEERS][to_addr][PE] == MUTUAL and
+                               profile[ACCOUNTS][sender][PE] == MUTUAL):
+        return (ENCRYPT, target_keys)
+    return (preliminary_recommendation, target_keys)
+
+
+def recommendation_multi(profile, sender, recipients, reply_to_ct):
+    target_keys = {}
+    ui_recommendations = []
+    for r in recipients:
+        rec, target = recommendation_single(profile, sender, r, reply_to_ct)
+        ui_recommendations.append(rec)
+        target_keys.update(target)
+    if DISABLE in ui_recommendations:
+        return (DISABLE, target_keys)
+    if DISCOURAGE in ui_recommendations:
+        return (DISCOURAGE, target_keys)
+    if ui_recommendations.count(ENCRYPT) == len(ui_recommendations):
+        return (ENCRYPT, target_keys)
+    return (AVAILABLE, target_keys)

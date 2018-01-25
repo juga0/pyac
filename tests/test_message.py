@@ -11,7 +11,7 @@ from email.parser import Parser
 
 from autocrypt.conflog import LOGGING
 from autocrypt.constants import (AC_PASSPHRASE_LEN, AC_PASSPHRASE_NUM_BLOCKS,
-                                 AC_PASSPHRASE_NUM_WORDS, MUTUAL)
+                                 AC_PASSPHRASE_NUM_WORDS, MUTUAL, AVAILABLE)
 from autocrypt.message import (gen_ac_headervaluestr, gen_ac_setup_ct,
                                gen_ac_setup_email, gen_ac_setup_passphrase,
                                gen_ac_setup_payload, gen_gossip_email,
@@ -20,14 +20,16 @@ from autocrypt.message import (gen_ac_headervaluestr, gen_ac_setup_ct,
                                parse_ac_email, parse_ac_setup_ct,
                                parse_ac_setup_email, parse_ac_setup_payload,
                                parse_email, parse_gossip_email,
-                               parse_gossip_list_from_msg, wrap)
+                               parse_gossip_list_from_msg, recommendation,
+                               recommendation_multi, recommendation_single,
+                               recommendation_single_phase1,
+                               recommendation_single_phase2, wrap)
 from autocrypt.storage import repr_profile
 from autocrypt.tests_data import (AC_SETUP_ENC, AC_SETUP_PAYLOAD, ALICE,
                                   ALICE_AC, ALICE_KEYDATA, BOB, BOB_GOSSIP,
                                   BOB_KEYDATA, BOB_KEYDATA_WRAPPED, BODY_AC,
                                   BODY_GOSSIP, CLEARTEXT_GOSSIP, PASSPHRASE,
                                   RECIPIENTS, SUBJECT_GOSSIP)
-
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -206,3 +208,21 @@ def test_parse_email(profile, datadir):
     text = datadir.read('example-simple-autocrypt-pyac.eml')
     pt = parse_ac_email(text, profile)
     assert parser.parsestr(pt).get_payload() == BODY_AC
+
+
+def test_recommendation_single_phase1(profile, datadir):
+    # ac_setup_ct = gen_ac_setup_ct(ALICE, MUTUAL, profile,
+    #                               '71DBC5657FDE65A7')
+    # logger.debug('ac_setup_ct %s', ac_setup_ct.split('\n')[:4])
+    # assert ac_setup_ct.split('\n')[:4] == \
+    #     datadir.read(
+    #         'example-setup-message-cleartext-pyac.key').split('\n')[:4]
+    rec, target = recommendation_single_phase1(profile, BOB)
+    logger.debug('rec, target %s %s', rec, target[BOB][:10])
+    logger.debug('alice keydata %s', BOB_KEYDATA[:10])
+    assert (rec, target) == (AVAILABLE, {BOB: BOB_KEYDATA})
+
+    rec, target = recommendation_single_phase1(profile, ALICE)
+    logger.debug('rec, target %s %s', rec, target[ALICE][:10])
+    logger.debug('alice keydata %s', ALICE_KEYDATA[:10])
+    assert (rec, target) == (AVAILABLE, {ALICE: ALICE_KEYDATA})

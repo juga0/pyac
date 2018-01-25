@@ -20,6 +20,8 @@ from pgpy.types import Armorable
 
 from .conflog import LOGGING
 from .constants import ACCOUNTS, KEY_SIZE, PEERS, PUBKEY, SECKEY
+from .string_util import unwrap, wrap
+
 
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger('autocrypt')
@@ -231,6 +233,15 @@ def _get_pubkey_from_addr(profile, addr):
 
 def _get_keyhandle_from_addr(profile, addr):
     key = _get_pubkey_from_addr(profile, addr)
+    return key.fingerprint.keyid
+
+
+def key_fingerprint_from_addr(profile, addr):
+    return _get_keyhandle_from_addr(profile, addr)
+
+
+def key_fingerprint(keydata):
+    key = _keydata2key(keydata)
     return key.fingerprint.keyid
 
 
