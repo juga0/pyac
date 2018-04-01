@@ -40,7 +40,7 @@ def main():
         extras_require={
             'dev': ['ipython', 'pyflakes', 'pep8'],
             'test': ['tox', 'pytest'],
-            'doc': ['sphinx', 'pylint']
+            'doc': ['sphinx', 'sphinx-bootstrap-theme', 'pylint']
         },
         python_requires=">=3.5",
         tests_require=['pytest'],
