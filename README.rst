@@ -2,17 +2,21 @@
 PyAC
 =====
 
-.. image:: https://badge.fury.io/py/pyac.svg
-    :target: https://badge.fury.io/py/pyac
-    :alt: Latest stable version
+.. image:: https://badge.fury.io/py/pyacr.svg
+    :target: https://badge.fury.io/py/pyacr
+    :alt: PyPI version
 
 .. image:: https://travis-ci.org/juga0/pyac.svg?branch=master
     :target: https://travis-ci.org/juga0/pyac?branch=master
-    :alt: Travis-CI
+    :alt: Build status
 
 .. image:: https://coveralls.io/repos/github/juga0/pyac/badge.svg?branch=master
     :target: https://coveralls.io/github/juga0/pyac?branch=master
     :alt: Coveralls
+
+.. image:: https://readthedocs.org/projects/pyac/badge/?version=latest
+    :target: http://pyac.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation status
 
 `Autocrypt Level 1 <https://autocrypt.org/en/latest/level1.html>`_
 implemention using `PGPy <https://github.com/SecurityInnovation/PGPy>`_ .
